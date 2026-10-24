@@ -14,7 +14,7 @@ const PLAN={
 export const BUILDING_MODELS=[
  {id:1,url:'./assets/buildings/building-1-barracks.glb?v=079'},
  {id:2,url:'./assets/buildings/building-2-community.glb?v=079'},
- {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=079'}
+ {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=080'}
 ];
 // Meshy output is front-facing +Z. Follow each actual doorway/interaction waypoint.
 function faceAngle(b){
