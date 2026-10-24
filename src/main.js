@@ -1,15 +1,15 @@
 import {loadGlb} from './core/glb.js';
-import {ArmyRenderer} from './core/renderer.js?v=041';
+import {ArmyRenderer} from './core/renderer.js?v=050';
 import {RigAnimator} from './characters/rigAnimator.js?v=041';
-import {CAMP,FEATURES,clampPos} from './map/camp.js';
+import {CAMP,FEATURES,moveWithCollision} from './map/camp.js?v=050';
+import {drawMinimap} from './ui/minimap.js?v=050';
 import {setupInput,setupAnimationButtons} from './ui/input.js';
 import {createEncounter} from './battle/encounter.js';
-import {options} from './systems/settings.js';
+import {options} from './systems/settings.js?v=050';
 const $=id=>document.getElementById(id);
 const banner=(s,duration=2600)=>{const notice=$('notice');notice.textContent=s;notice.hidden=false;clearTimeout(banner.timer);if(duration)banner.timer=setTimeout(()=>notice.hidden=true,duration)};
 function distance(a,b){return Math.hypot(a.x-b.x,a.z-b.z)}
 function setDirection(actor,x,z){const want=Math.atan2(x,z),diff=Math.atan2(Math.sin(want-actor.angle),Math.cos(want-actor.angle));actor.angle+=diff*.21}
-function inBuilding(p){return (p.x>-6.75&&p.x<-2.25&&p.z>-5.42&&p.z<-2.34)||(p.x>-7.5&&p.x<-2.75&&p.z>4.22&&p.z<6.72)}
 const actions={locomotion:new Set(['Walking','Running','Casual_Walk','RunFast','Run_03']),oneShots:new Set(['BeHit_FlyUp','Dead','Arise','Boxing_Practice'])};
 async function boot(){let renderer;try{
  const canvas=$('world');renderer=new ArmyRenderer(canvas);
@@ -23,28 +23,29 @@ async function boot(){let renderer;try{
    player.anim.setClip(clip,{restart:true});banner({Dead:'倒地測試：點「起身」恢復',Arise:'起身測試',BeHit_FlyUp:'受擊測試',Boxing_Practice:'拳擊測試'}[clip]||clip,1500);
  });
  select('Walking');
- let zoom=9,camYaw=.66,camPitch=.62;
- const input=setupInput(canvas,(dx,dy)=>{camYaw+=dx;camPitch=Math.max(.32,Math.min(1.14,camPitch+dy));},()=>{camYaw=.66;camPitch=.62;zoom=9;banner('鏡頭已復位',1300)});
+ let zoom=options.zoom,camYaw=.66,camPitch=.69;
+ const input=setupInput(canvas,(dx,dy)=>{camYaw+=dx;camPitch=Math.max(.32,Math.min(1.14,camPitch+dy));},()=>{camYaw=.66;camPitch=.69;zoom=options.zoom;banner('鏡頭已復位',1300)});
  document.querySelector('#attack').onclick=()=>{
   player.anim.setClip('Boxing_Practice',{restart:true});const hit=encounter.poke(player,distance(player.pos,foe.pos));banner(hit.message,1750);
  };
  document.querySelector('#resetEnemy').onclick=()=>banner(encounter.reset().message,1250);
  document.querySelector('#ecoview').addEventListener('change',e=>{options.eco=e.target.checked;window.armyEco=options.eco;banner(options.eco?'省電模式：降低畫面解析度':'恢復標準畫質',1400)});
- banner('✅ 進入軍營！左下搖桿走路',2200);
+ banner('✅ v0.5 大軍營開放！移動速度已加快，右側可看小地圖',3500);
  let last=performance.now(),fpsAt=last,frames=0,foePhase=0,lastLoc='',lastMoving=false,lastFrame=0;
  function loop(now){const dt=Math.min(.045,(now-last)/1000);last=now;const dir=input(),mag=Math.hypot(dir.x,dir.y);
   if(player.anim.clip==='BeHit_FlyUp'&&player.anim.finished())player.anim.setClip('Idle');
   if(player.anim.clip==='Boxing_Practice'&&player.anim.finished())player.anim.setClip('Idle');
   if(player.anim.clip==='Arise'&&player.anim.finished())player.anim.setClip('Idle');
   if(mag>.1&&player.anim.clip!=='Dead'&&player.anim.clip!=='BeHit_FlyUp'){
-    const mode=options.playerMode,speed=(mode==='Running'||mode==='RunFast'?options.runSpeed:options.moveSpeed),c=Math.cos(camYaw),s=Math.sin(camYaw);
+    const mode=options.playerMode,speed=(mode==='RunFast'?options.sprintSpeed:mode==='Running'||mode==='Run_03'?options.runSpeed:mode==='Casual_Walk'?options.casualSpeed:options.moveSpeed),c=Math.cos(camYaw),s=Math.sin(camYaw);
     // Camera-relative controls; correct character forward is model-local +Z.
     const mx=dir.x*c-dir.y*s,mz=-dir.x*s-dir.y*c;
-    const next=clampPos({x:player.pos.x+mx*dt*speed,z:player.pos.z+mz*dt*speed});
-    if(!inBuilding(next))player.pos=next;
+    player.pos=moveWithCollision(player.pos,mx*dt*speed,mz*dt*speed);
     setDirection(player,mx,mz);if(player.anim.clip!==mode)player.anim.setClip(mode);
     lastMoving=true;
   }else if(lastMoving){lastMoving=false;if(actions.locomotion.has(player.anim.clip))player.anim.setClip('Idle');}
+  // Match footfall pace to faster travel speed; do not speed up one-shot actions.
+  player.anim.speed=mag>.1&&actions.locomotion.has(player.anim.clip)?({'Walking':1.62,'Casual_Walk':1.25,'Running':1.34,'RunFast':1.42,'Run_03':1.34}[player.anim.clip]||1):1;
   player.anim.evaluate(dt);
   if(!encounter.dead){
    if(foe.anim.clip==='BeHit_FlyUp'&&foe.anim.finished())foe.anim.setClip('Casual_Walk');
@@ -55,7 +56,7 @@ async function boot(){let renderer;try{
   }
   foe.anim.evaluate(dt);
   renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom});renderer.startFrame(player.pos);renderer.drawActor('recruit',player);renderer.drawActor('red',foe);
-  if(now-lastFrame>220){lastFrame=now;let near=FEATURES.reduce((best,f)=>{const d=distance(player.pos,f);return d<best.d?{d,loc:f.label}:best},{d:1e9,loc:''});const text=near.d<2.5?'📍 '+near.loc:'📍 新訓中心 · 軍營道路';if(text!==lastLoc){$('label').textContent=text;lastLoc=text}$('enemyStatus').textContent=encounter.dead?'🔴 紅隊菜兵 · 已倒地':`🔴 紅隊菜兵 · HP ${3-encounter.hits}/3 · 距離 ${distance(player.pos,foe.pos).toFixed(1)}m`;$('state').textContent=player.anim.clip;}
+  if(now-lastFrame>220){lastFrame=now;let near=FEATURES.reduce((best,f)=>{const d=distance(player.pos,f);return d<best.d?{d,loc:f.label}:best},{d:1e9,loc:''});const text=near.d<(FEATURES.find(f=>f.label===near.loc)?.r||2.5)?'📍 '+near.loc:'📍 新訓中心 · 軍營道路';if(text!==lastLoc){$('label').textContent=text;lastLoc=text}$('enemyStatus').textContent=encounter.dead?'🔴 紅隊菜兵 · 已倒地':`🔴 紅隊菜兵 · HP ${3-encounter.hits}/3 · 距離 ${distance(player.pos,foe.pos).toFixed(1)}m`;$('state').textContent=player.anim.clip;drawMinimap(player.pos,foe.pos,encounter.dead);}
   frames++;if(now-fpsAt>=1000){$('fps').textContent=`${Math.round(frames*1000/(now-fpsAt))} FPS`;fpsAt=now;frames=0}requestAnimationFrame(loop)
  }
  requestAnimationFrame(loop);
