@@ -53,9 +53,7 @@ export function makeEnvironment(){
  roundedPad(-20.0,11.7,13,2.5,C.path);
  roundedPad(22,-11.65,15,2.1,C.path);
  roundedPad(2,14.0,15,2.5,C.path);
- // Courtyard grids: paving blocks
- for(let x=-6;x<=6;x+=1.5){rect(x,1,.027,9.0,[.741,.752,.674],.054,.014)}
- for(let z=-3;z<=5;z+=1.4){rect(0,z,13.3,.027,[.741,.752,.674],.054,.014)}
+ // Intentionally keep parade courtyard surface clean: no tile grid overlays.
  // Buildings and their modular decorations
  for(const b of BUILDINGS){let p=palette[b.kind]||palette.barracks;
   cube(b.x,.04,b.z,b.w,b.h,b.d,p.wall);
@@ -76,8 +74,7 @@ export function makeEnvironment(){
   }
   cube(b.x,.06,b.z-b.d/2-.07,b.w*.58,.15,.13,p.trim);
  }
- // Parade assembly stripes, flag base and rail
- for(let z=-1.8;z<=3.5;z+=1.28)rect(0,z,11.4,.055,C.line,.061,.013);
+ // Parade pole and base; remove all white assembly floor stripes.
  cube(-5.4,.055,-2.65,1.3,.29,1.3,C.stone);cube(-5.4,.32,-2.65,.12,4.9,.12,[.75,.78,.73]);
  quad([-5.32,4.85,-2.58],[-3.5,4.85,-2.58],[-3.5,3.95,-2.58],[-5.32,3.95,-2.58],[.803,.400,.363]);
  cube(-5.38,.23,-2.4,2.45,.15,1.05,C.stone);

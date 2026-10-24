@@ -1,6 +1,11 @@
 // Floating analog stick: touch the lower screen to move. Upper screen pans camera.
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 export function setupInput(canvas,onCamera){
+ // Prevent iPhone Safari's text-selection magnifier and Copy/Translate menu
+ // while touching the game. Do not interfere with pointer move/up gameplay events.
+ for(const eventName of ['contextmenu','selectstart','dragstart']){
+  document.addEventListener(eventName,e=>{if(e.cancelable)e.preventDefault()},{passive:false});
+ }
  const stick=document.getElementById('floatingStick'),thumb=document.getElementById('stickThumb');
  const state={x:0,y:0,magnitude:0},keys=new Set(),R=60;
  let moving=null,viewing=null;

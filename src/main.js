@@ -1,9 +1,9 @@
 import {loadGlb} from './core/glb.js?v=060';
-import {ArmyRenderer} from './core/renderer.js?v=060';
+import {ArmyRenderer} from './core/renderer.js?v=061';
 import {RigAnimator} from './characters/rigAnimator.js?v=060';
 import {CAMP,moveWithCollision} from './map/camp.js?v=060';
-import {drawMinimap} from './ui/minimap.js?v=060';
-import {setupInput} from './ui/input.js?v=060';
+import {drawMinimap} from './ui/minimap.js?v=061';
+import {setupInput} from './ui/input.js?v=061';
 import {options} from './systems/settings.js?v=060';
 
 const $=id=>document.getElementById(id);
