@@ -35,7 +35,7 @@ export const ZONES = [
  {id:'grenade',label:'手榴彈投擲場',kind:'ellipse',x:-20.5,z:-11.0,w:8.5,d:6.9,color:'#a99b88'},
  {id:'range',label:'500公尺障礙場',kind:'rect',x:12,z:9.6,w:26.5,d:4.7,color:'#d2c39c'},
  {id:'target',label:'靶場',kind:'rect',x:10.6,z:20.0,w:22,d:6.6,color:'#b4bba0'},
- {id:'single',label:'單兵戰鬥教練場',kind:'rect',x:12,z:3.4,w:26,d:9.4,color:'#c1b18c'},
+ {id:'single',label:'單兵戰鬥教練場',kind:'rect',x:12,z:2.95,w:26,d:8.5,color:'#c1b18c'},
  {id:'assembly',label:'連隊集合場',kind:'rect',x:15,z:-8.2,w:19.5,d:6.9,color:'#d8bda0'},
  {id:'fitness',label:'單槓／體能訓練場',kind:'rect',x:20,z:-16.2,w:13.5,d:4.5,color:'#c4c49c'},
  {id:'smoke',label:'吸菸區',kind:'ellipse',x:-39,z:-18.1,w:7,d:4.8,color:'#95b093'},

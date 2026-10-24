@@ -1,6 +1,6 @@
-// Army v0.7 — ONE cartographic renderer shared by radar and full-camp map.
+// Army v0.7.2 — ONE cartographic renderer shared by radar and full-camp map.
 // Coordinates and colors come from camp.js. The world stays north-up.
-import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=070';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=072';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
@@ -9,19 +9,11 @@ function playerIcon(ctx,x,y,heading,scale=1){
  ctx.beginPath();ctx.moveTo(0,-14*scale);ctx.lineTo(6.8*scale,-3*scale);ctx.lineTo(0,-6*scale);ctx.lineTo(-6.8*scale,-3*scale);ctx.closePath();ctx.fillStyle='#137ef1';ctx.strokeStyle='#fff';ctx.lineWidth=2.5*scale;ctx.fill();ctx.stroke();
  ctx.beginPath();ctx.arc(0,0,6.8*scale,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
 }
-let miniCenter=null; // Keep the local minimap north-up AND mostly stationary; the player icon moves.
+// The minimap is always player-centered: the icon stays at the center.
 export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=false}){
  if(!ctx||!player||![player.x,player.z,heading].every(Number.isFinite))return;
  const scale=mini?width/36.8:Math.min((width-18)/(CAMP.width+3),(height-20)/(CAMP.depth+5));
- if(mini){
-  if(!miniCenter)miniCenter={x:player.x,z:player.z};
-  const safe=9.2; // player moves visibly left/right on map, then the viewport pans at its edge.
-  if(player.x-miniCenter.x>safe)miniCenter.x=player.x-safe;
-  else if(player.x-miniCenter.x< -safe)miniCenter.x=player.x+safe;
-  if(player.z-miniCenter.z>safe)miniCenter.z=player.z-safe;
-  else if(player.z-miniCenter.z< -safe)miniCenter.z=player.z+safe;
- }
- const center=mini?miniCenter:{x:0,z:0};
+ const center=mini?player:{x:0,z:0};
  const px=x=>width/2+(x-center.x)*scale,py=z=>height/2-(z-center.z)*scale;
  const poly=(pts,fill,stroke,sw=1)=>{ctx.beginPath();pts.forEach(([x,z],i)=>i?ctx.lineTo(px(x),py(z)):ctx.moveTo(px(x),py(z)));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}};
  const rect=(x,z,w,d,color,border)=>{

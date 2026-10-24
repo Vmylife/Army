@@ -1,6 +1,6 @@
 // Army v0.7 — colorful, low-poly army camp matching the 22.0 blueprint.
 // All gameplay geometry is derived from camp.js, so the two maps stay in sync.
-import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=070';
+import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=072';
 import {ROAD_EDGE_TRIANGLES,ROAD_FILL_TRIANGLES} from './roadMesh.js?v=071';
 const C={
  grass:[.674,.764,.615],lightGrass:[.716,.801,.661],road:[.863,.833,.740],roadEdge:[.736,.724,.650],
@@ -81,7 +81,7 @@ export function makeEnvironment(){
   const cnt=Math.ceil(dist/3.5);for(let t=0;t<cnt;t++){let xx=a[0]+dx*(t+.5)/cnt,zz=a[1]+dz*(t+.5)/cnt;
    segment(xx-dx/cnt*.45,zz-dz/cnt*.45,xx+dx/cnt*.45,zz+dz/cnt*.45,.045,1.10,C.dark)}
  }
- // Ground zones get unique heights to prevent coincident polygons from flickering.
+ // ZONES footprints do not overlap (single-combat / 500m obstacle are disjoint).
  // Especially the grenade throwing area overlaps the main drill field in plan view.
  for(const zone of ZONES){const color=hex(zone.color);
   if(zone.kind==='ellipse')disk(zone.x,zone.z,zone.w/2,zone.d/2,zone.id==='grenade'?.051:.034,color,70);
