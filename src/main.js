@@ -2,7 +2,7 @@ import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=072';
 import {RigAnimator} from './characters/rigAnimator.js?v=060';
 import {CAMP,moveWithCollision} from './map/camp.js?v=072';
-import {drawMinimap} from './ui/minimap.js?v=072';
+import {drawMinimap} from './ui/minimap.js?v=074';
 import {initWorldMap} from './ui/worldMap.js?v=072';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
@@ -74,7 +74,7 @@ async function boot(){
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
     renderer.drawActor('recruit',player);
     if(foe)renderer.drawActor('red',foe);
-    if(now-lastMap>100){drawMinimap(player.pos,foe?.pos||null,false,mapFacing);worldMap.update(player.pos,foe?.pos||null,mapFacing);lastMap=now}
+    if(now-lastMap>100){drawMinimap(player.pos,foe?.pos||null,false,mapFacing,camYaw);worldMap.update(player.pos,foe?.pos||null,player.angle);lastMap=now}
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`mode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
     requestAnimationFrame(tick);
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}

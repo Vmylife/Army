@@ -1,5 +1,5 @@
-// Army v0.7.2 — ONE cartographic renderer shared by radar and full-camp map.
-// Coordinates and colors come from camp.js. The world stays north-up.
+// Army v0.7.2 — Full map is north-up; minimap is camera-aligned (not actor-aligned).
+// Coordinates and colors come from camp.js. The complete world map stays north-up.
 import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=072';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
@@ -10,7 +10,7 @@ function playerIcon(ctx,x,y,heading,scale=1){
  ctx.beginPath();ctx.arc(0,0,6.8*scale,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
 }
 // The minimap is always player-centered: the icon stays at the center.
-export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=false}){
+export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=false,cameraYaw=0}){
  if(!ctx||!player||![player.x,player.z,heading].every(Number.isFinite))return;
  const scale=mini?width/36.8:Math.min((width-18)/(CAMP.width+3),(height-20)/(CAMP.depth+5));
  const center=mini?player:{x:0,z:0};
@@ -24,7 +24,19 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  const dot=(x,z,r,c)=>{ctx.beginPath();ctx.arc(px(x),py(z),r,0,2*Math.PI);ctx.fillStyle=c;ctx.fill()};
  ctx.clearRect(0,0,width,height);
  ctx.save();
- if(mini){ctx.beginPath();ctx.arc(width/2,height/2,width*.487,0,Math.PI*2);ctx.clip()}
+ if(mini){
+  // Clip to the circular radar before applying the camera-space view transform.
+  // Character stays centered. The whole world pans opposite to screen movement.
+  // The full map (mini=false) is deliberately unchanged and north-up.
+  ctx.beginPath();ctx.arc(width/2,height/2,width*.487,0,Math.PI*2);ctx.clip();
+  const yaw=Number.isFinite(cameraYaw)?cameraYaw:0;
+  const c=Math.cos(yaw),s=Math.sin(yaw);
+  ctx.translate(width/2,height/2);
+  // Local original coordinates are (worldX, -worldZ). Convert to camera-space
+  // axes: right=(cos yaw,-sin yaw), up=(-sin yaw,-cos yaw).
+  ctx.transform(c,s,s,-c,0,0);
+  ctx.translate(-width/2,-height/2);
+ }
  ctx.fillStyle='#e9e6d6';ctx.fillRect(0,0,width,height);
  poly(PERIMETER,'#aec79d','#435c4c',Math.max(1.1,scale*.24));
  // Foothills on the northern boundary are part of the plan.
@@ -63,7 +75,14 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
   for(const [name,x,z] of names){const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,px(x),py(z));ctx.fillStyle='#344c3b';ctx.fillText(name,px(x),py(z))}
  }
  if(enemy){dot(enemy.x,enemy.z,mini?4.3:5,'#d45457');ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px(enemy.x),py(enemy.z),mini?4.3:5,0,Math.PI*2);ctx.stroke()}
- playerIcon(ctx,px(player.x),py(player.z),heading,mini?1:.95);
- if(!mini){ctx.fillStyle='#2f5c42';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='bold 13px system-ui';ctx.fillText('N ↑',width/2,5)}
+ if(mini){
+  // Restore the radar map transform BEFORE drawing the avatar marker.
+  // This keeps the blue arrow upright in screen-space, independently of camera yaw.
+  ctx.restore();
+  playerIcon(ctx,width/2,height/2,heading,1);
+  return;
+ }
+ playerIcon(ctx,px(player.x),py(player.z),heading,.95);
+ ctx.fillStyle='#2f5c42';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='bold 13px system-ui';ctx.fillText('N ↑',width/2,5);
  ctx.restore();
 }
