@@ -131,6 +131,8 @@ export function makeEnvironment(){
  // Simple v0.6-style houses: clean solid walls, one roof, entrance and windows.
  // Detailed Meshy architecture can be added later without changing the camp layout.
  for(const b of BUILDINGS){
+  // Nine Meshy buildings are drawn separately using shared GLB assets.
+  if(b.id!=='wash' && b.id!=='guard')continue;
   const p=P[b.kind]||P.barracks;
   box(b.x,.035,b.z,b.w,b.h,b.d,p.wall);
   box(b.x,b.h-.07,b.z,b.w+.22,.15,b.d+.22,p.trim);

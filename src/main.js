@@ -1,5 +1,6 @@
+import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=079';
 import {loadGlb} from './core/glb.js?v=060';
-import {ArmyRenderer} from './core/renderer.js?v=078';
+import {ArmyRenderer} from './core/renderer.js?v=079';
 import {RigAnimator} from './characters/rigAnimator.js?v=077';
 import {CAMP,moveWithCollision} from './map/camp.js?v=072';
 import {drawMinimap} from './ui/minimap.js?v=076';
@@ -32,6 +33,14 @@ async function boot(){
   step='下載主角 GLB';status('載入阿兵哥…');
   const heroGlb=await stage(loadGlb(modelUrl),'主角模型');
   step='建立主角貼圖';await stage(renderer.addModel('recruit',heroGlb),'主角貼圖');
+  // Load each of the three building meshes once; reuse them at all nine locations.
+  // Model downloads run in parallel; failure does not block the controllable soldier.
+  const buildings=new CampBuildings(renderer.gl);
+  const buildingReady=Promise.all(BUILDING_MODELS.map(async model=>{
+   const glb=await stage(loadGlb(model.url),'建築 '+model.id,120000);
+   await buildings.add(model.id,glb);
+  })).then(()=>console.info('九棟 Meshy 建築完成載入'))
+     .catch(err=>{console.error('建築載入失敗',err);status('部分建築載入失敗，請確認 assets/buildings 已完整上傳');setTimeout(()=>status(''),6500)});
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
   player.anim.setClip('Idle');player.anim.evaluate(0);
   let foe=null;
@@ -92,6 +101,7 @@ async function boot(){
      foe.anim.evaluate(dt);
     }
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
+    buildings.draw(renderer.vp,player.pos);
     renderer.drawActor('recruit',player);
     if(foe)renderer.drawActor('red',foe);
 
