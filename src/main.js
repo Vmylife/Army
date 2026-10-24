@@ -1,9 +1,9 @@
 import {loadGlb} from './core/glb.js';
-import {ArmyRenderer} from './core/renderer.js?v=052';
+import {ArmyRenderer} from './core/renderer.js?v=054';
 import {RigAnimator} from './characters/rigAnimator.js?v=041';
 import {CAMP,moveWithCollision} from './map/camp.js?v=050';
 import {drawMinimap} from './ui/minimap.js?v=052';
-import {setupInput} from './ui/input.js?v=051';
+import {setupInput} from './ui/input.js?v=054';
 import {options} from './systems/settings.js?v=053';
 const $=id=>document.getElementById(id);
 const notice=(s)=>{const el=$('notice');if(!s){el.hidden=true;return;}el.textContent=s;el.hidden=false};
@@ -48,6 +48,7 @@ async function boot(){
   notice('');
   let last=performance.now(),foePhase=0,lastMapFrame=0,lastMode='Idle';
   function loop(now){
+   try{
    const dt=Math.min(.045,Math.max(0,(now-last)/1000));last=now;
    const dir=input();const strength=dir.magnitude;
    if(player.anim.clip==='BeHit_FlyUp'&&player.anim.finished())player.anim.setClip('Idle');
@@ -81,7 +82,20 @@ async function boot(){
    renderer.drawActor('recruit',player);
    renderer.drawActor('red',foe);
    if(now-lastMapFrame>70){lastMapFrame=now;drawMinimap(player.pos,foe.pos,false,player.angle)}
+   // Check for silent GPU failures once; never leave the user staring at
+   // an apparently frozen empty playground.
+   if(renderer.avatarRenderMode==='missing'){
+     const el=$('fatal');el.hidden=false;
+     el.textContent='角色沒有成功繪製：'+renderer.avatarRenderIssue+'（請截圖這段文字回報）';
+   }
    requestAnimationFrame(loop);
+   }catch(error){
+    console.error('Army animation loop:',error);
+    const el=$('fatal');el.hidden=false;
+    el.textContent='軍營執行錯誤：'+String(error?.stack||error)+'（請截圖回報）';
+    // Repaint on next frame after a transient failure, without flooding FPS.
+    requestAnimationFrame(loop);
+   }
   }
   requestAnimationFrame(loop);
  }catch(error){
