@@ -3,8 +3,8 @@ const canvas=document.getElementById('miniCanvas');
 const box=document.getElementById('minimap');
 const toggle=document.getElementById('mapToggle');
 const ctx=canvas?.getContext('2d');
-let hidden=false;
-toggle?.addEventListener('click',()=>{hidden=!hidden;box?.classList.toggle('collapsed',hidden);toggle.textContent=hidden?'展開':'收合'});
+let hidden=true;
+toggle?.addEventListener('click',()=>{hidden=!hidden;box?.classList.toggle('collapsed',hidden);toggle.textContent=hidden?'展開':'收合';toggle.setAttribute('aria-expanded',String(!hidden))});
 function px(x){return (x-CAMP.bounds.left)/(CAMP.bounds.right-CAMP.bounds.left)*canvas.width}
 function py(z){return (z-CAMP.bounds.top)/(CAMP.bounds.bottom-CAMP.bounds.top)*canvas.height}
 function square(x,z,w,d,color){ctx.fillStyle=color;ctx.fillRect(px(x-w/2),py(z-d/2),px(x+w/2)-px(x-w/2),py(z+d/2)-py(z-d/2))}
