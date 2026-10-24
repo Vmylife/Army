@@ -1,5 +1,5 @@
-// Army v0.7.2 — Full map is north-up; minimap is camera-aligned (not actor-aligned).
-// Coordinates and colors come from camp.js. The complete world map stays north-up.
+// Army v0.7.5 — Both maps use one camera-aligned cartographic projection.
+// World coordinate sources remain unchanged. Only render orientation is transformed.
 import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=072';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
@@ -12,9 +12,16 @@ function playerIcon(ctx,x,y,heading,scale=1){
 // The minimap is always player-centered: the icon stays at the center.
 export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=false,cameraYaw=0}){
  if(!ctx||!player||![player.x,player.z,heading].every(Number.isFinite))return;
- const scale=mini?width/36.8:Math.min((width-18)/(CAMP.width+3),(height-20)/(CAMP.depth+5));
+ const yaw=Number.isFinite(cameraYaw)?cameraYaw:0;
+ const c=Math.cos(yaw),s=Math.sin(yaw);
+ const mapW=CAMP.width+3,mapH=CAMP.depth+5;
+ const visualW=Math.abs(c)*mapW+Math.abs(s)*mapH;
+ const visualH=Math.abs(s)*mapW+Math.abs(c)*mapH;
+ const scale=mini?width/36.8:Math.min((width-18)/visualW,(height-20)/visualH);
  const center=mini?player:{x:0,z:0};
  const px=x=>width/2+(x-center.x)*scale,py=z=>height/2-(z-center.z)*scale;
+ // Drawn coordinates after the shared mirror/rotation transform.
+ const projected=(x,z)=>{const u=(x-center.x)*scale,v=-(z-center.z)*scale;return [width/2+c*u+s*v,height/2+s*u-c*v]};
  const poly=(pts,fill,stroke,sw=1)=>{ctx.beginPath();pts.forEach(([x,z],i)=>i?ctx.lineTo(px(x),py(z)):ctx.moveTo(px(x),py(z)));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}};
  const rect=(x,z,w,d,color,border)=>{
   const a=px(x-w/2),b=py(z+d/2);
@@ -24,16 +31,13 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  const dot=(x,z,r,c)=>{ctx.beginPath();ctx.arc(px(x),py(z),r,0,2*Math.PI);ctx.fillStyle=c;ctx.fill()};
  ctx.clearRect(0,0,width,height);
  ctx.save();
- if(mini){
-  // Clip to the circular radar before applying the camera-space view transform.
+ if(mini){ctx.beginPath();ctx.arc(width/2,height/2,width*.487,0,Math.PI*2);ctx.clip();}
+ {
+  // SAME camera-aligned projection on both maps: no independent horizontal mirroring.
   // Character stays centered. The whole world pans opposite to screen movement.
-  // The full map (mini=false) is deliberately unchanged and north-up.
-  ctx.beginPath();ctx.arc(width/2,height/2,width*.487,0,Math.PI*2);ctx.clip();
-  const yaw=Number.isFinite(cameraYaw)?cameraYaw:0;
-  const c=Math.cos(yaw),s=Math.sin(yaw);
+  // Both maps use the same projection. Full map is never clipped to the radar circle.
+  // Draw world geometry in the common viewing coordinate system.
   ctx.translate(width/2,height/2);
-  // Local original coordinates are (worldX, -worldZ). Convert to camera-space
-  // axes: right=(cos yaw,-sin yaw), up=(-sin yaw,-cos yaw).
   ctx.transform(c,s,s,-c,0,0);
   ctx.translate(-width/2,-height/2);
  }
@@ -69,20 +73,18 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  }
  // Features mark access points outside building colliders; all can be reached on foot.
  for(const f of FEATURES)dot(f.x,f.z,mini?2.3:Math.max(2.6,scale*.36),f.color);
- if(!mini){
-  // Centered primary labels, with surrounding detail available in the list below.
-  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43,-4],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2]];
-  for(const [name,x,z] of names){const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,px(x),py(z));ctx.fillStyle='#344c3b';ctx.fillText(name,px(x),py(z))}
- }
  if(enemy){dot(enemy.x,enemy.z,mini?4.3:5,'#d45457');ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px(enemy.x),py(enemy.z),mini?4.3:5,0,Math.PI*2);ctx.stroke()}
- if(mini){
-  // Restore the radar map transform BEFORE drawing the avatar marker.
-  // This keeps the blue arrow upright in screen-space, independently of camera yaw.
-  ctx.restore();
-  playerIcon(ctx,width/2,height/2,heading,1);
-  return;
- }
- playerIcon(ctx,px(player.x),py(player.z),heading,.95);
- ctx.fillStyle='#2f5c42';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='bold 13px system-ui';ctx.fillText('N ↑',width/2,5);
+ // Finish the shared map projection before painting HUD markers/text.
  ctx.restore();
+ if(!mini){
+  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43,-4],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2]];
+  for(const [name,x,z] of names){const [sx,sy]=projected(x,z);const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,sx,sy);ctx.fillStyle='#344c3b';ctx.fillText(name,sx,sy)}
+  // Compass shows actual geographical north after map alignment.
+  const nx=-Math.sin(yaw),ny=Math.cos(yaw),cx=width-29,cy=27;
+  ctx.save();ctx.translate(cx,cy);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(nx*13,ny*13);ctx.strokeStyle='#20503b';ctx.lineWidth=2.4;ctx.stroke();ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#20503b';ctx.fillText('N',nx*21,ny*21);ctx.restore();
+ }
+ const [playerX,playerY]=mini?[width/2,height/2]:projected(player.x,player.z);
+ // Heading is provided from actual player.angle; rotating camera while stationary
+ // does not mutate it, because main.js freezes mapYaw until the soldier moves.
+ playerIcon(ctx,playerX,playerY,heading,mini?1:.95);
 }

@@ -2,9 +2,10 @@ import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=072';
 import {RigAnimator} from './characters/rigAnimator.js?v=060';
 import {CAMP,moveWithCollision} from './map/camp.js?v=072';
-import {drawMinimap} from './ui/minimap.js?v=074';
-import {initWorldMap} from './ui/worldMap.js?v=072';
+import {drawMinimap} from './ui/minimap.js?v=075';
+import {initWorldMap} from './ui/worldMap.js?v=075';
 import {setupInput} from './ui/input.js?v=062';
+import {createLodShowcase} from './ui/lodShowcase.js?v=075';
 import {options} from './systems/settings.js?v=060';
 
 const $=id=>document.getElementById(id);
@@ -34,6 +35,7 @@ async function boot(){
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
   player.anim.setClip('Idle');player.anim.evaluate(0);
   let foe=null;
+  const lodShowcase=createLodShowcase(renderer);
   let camYaw=options.cameraYaw,camPitch=options.cameraPitch;
   // Existing camera distance is the nearest zoom. Pinch/wheel may only zoom out to 2x.
   const minZoom=options.zoom,maxZoom=minZoom*2;
@@ -43,23 +45,26 @@ async function boot(){
     ratio=>{if(!worldMap.isOpen()&&Number.isFinite(ratio)&&ratio>0)targetZoom=Math.max(minZoom,Math.min(maxZoom,targetZoom*ratio))}
   );
   let last=performance.now(),lastMap=0,lastDebug=0,foePhase=0;
-  // UI facing is based on the direction the player actually pushes on screen.
-  // This keeps right swipe => right-pointing blue arrow regardless of camera orbit.
-  let mapFacing=0;
+  // Both maps use the SAME camera-aligned projection. Keep the map heading
+  // stable while stationary; rotating only the camera never rotates the soldier arrow.
+  let mapYaw=camYaw;
+  let mapFacing=Math.PI-player.angle+mapYaw;
   status('');
   // The world starts as soon as the protagonist loads, without waiting for the enemy.
   function tick(now){
    try{
     const dt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;
     const stick=worldMap.isOpen()?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
-    if(m.speed>0 && Math.hypot(stick.x,stick.y)>0.01)mapFacing=Math.atan2(stick.x,stick.y);
     cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
     if(m.speed>0){
      const dx=stick.x/(stick.magnitude||1),dy=stick.y/(stick.magnitude||1);
      const c=Math.cos(camYaw),s=Math.sin(camYaw);
      const mx=dx*c-dy*s,mz=-dx*s-dy*c;
+     const before=player.pos;
      player.pos=moveWithCollision(player.pos,mx*dt*m.speed,mz*dt*m.speed);
-     face(player,mx,mz);
+     if(Math.hypot(player.pos.x-before.x,player.pos.z-before.z)>1e-5){
+      face(player,mx,mz);mapYaw=camYaw;
+     }
     }
     if(player.anim.clip!==m.clip)player.anim.setClip(m.clip);
     player.anim.speed=m.rate;player.anim.evaluate(dt);
@@ -74,7 +79,9 @@ async function boot(){
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
     renderer.drawActor('recruit',player);
     if(foe)renderer.drawActor('red',foe);
-    if(now-lastMap>100){drawMinimap(player.pos,foe?.pos||null,false,mapFacing,camYaw);worldMap.update(player.pos,foe?.pos||null,player.angle);lastMap=now}
+    lodShowcase.draw(dt,player.pos);
+    mapFacing=Math.PI-player.angle+mapYaw;
+    if(now-lastMap>100){drawMinimap(player.pos,foe?.pos||null,false,mapFacing,mapYaw);worldMap.update(player.pos,foe?.pos||null,mapFacing,mapYaw);lastMap=now}
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`mode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
     requestAnimationFrame(tick);
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}
@@ -87,6 +94,7 @@ async function boot(){
    foe={pos:{...CAMP.enemySpawn},angle:Math.PI,anim:new RigAnimator(glb)};
    foe.anim.setClip('Casual_Walk');foe.anim.evaluate(0);
   }catch(error){console.warn('敵人載入失敗，主角仍可遊玩',error)}
+  void lodShowcase.load();
  }catch(error){console.error('Army 啟動階段',step,error);errorMessage(step+'：'+String(error.message||error))}
 }
 boot();
