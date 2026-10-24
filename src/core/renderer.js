@@ -7,7 +7,7 @@ uniform mat4 uVP,uModel;uniform mat4 uBones[44];
 out vec2 vUV;out vec3 vN;out vec3 vPos;
 void main(){ivec4 ji=ivec4(j+0.5);mat4 skin=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uBones[ji.z]*w.z+uBones[ji.w]*w.w;vec4 wp=uModel*skin*vec4(p,1.0);gl_Position=uVP*wp;vUV=uv;vN=normalize(mat3(uModel)*mat3(skin)*n);vPos=wp.xyz;}`;
 const SKIN_FS=`#version 300 es
-precision mediump float;in vec2 vUV;in vec3 vN;in vec3 vPos;uniform sampler2D uTexture;out vec4 frag;
+precision highp float;in vec2 vUV;in vec3 vN;in vec3 vPos;uniform sampler2D uTexture;out vec4 frag;
 void main(){vec3 base=texture(uTexture,vUV).rgb;float sun=max(0.,dot(normalize(vN),normalize(vec3(-0.4,1.1,0.55))));float light=.78+.25*sun;frag=vec4(base*light,1.);}`;
 const STATIC_VS=`#version 300 es
 precision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 c;layout(location=2)in vec3 n;uniform mat4 uVP;out vec3 vColor;out vec3 vN;void main(){gl_Position=uVP*vec4(p,1.);vColor=c;vN=n;}`;
@@ -46,7 +46,14 @@ export class ArmyRenderer{
   for(const [k,loc,size] of map){const idx=pr.attributes[k],acc=gltf.json.accessors[idx];attrib(gl,loc,gltf.read(idx),size,acc.componentType)}
   const idxAcc=gltf.json.accessors[pr.indices],inds=gltf.read(pr.indices),buf=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buf);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,inds,gl.STATIC_DRAW);gl.bindVertexArray(null);
   const material=gltf.json.materials[pr.material],tid=material.pbrMetallicRoughness.baseColorTexture.index,imgid=gltf.json.textures[tid].source,url=textureUrl||URL.createObjectURL(gltf.imageFrom(imgid));let image=new Image();try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url})}finally{if(!textureUrl)URL.revokeObjectURL(url)}
-  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);// Meshy puts closely packed UV islands into a 2048px color atlas.
+  // On mobile, auto-generated mipmaps can blend adjacent islands and expose
+  // fine dark lines around sleeves, cap, neck and hands. Keep full-resolution
+  // bilinear sampling; UVs of this asset are all within 0..1.
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   
   // Small CPU sample for ground contact: correct Meshy clip-specific root offsets
   // without editing the supplied rig or animation curves.

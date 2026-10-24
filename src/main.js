@@ -1,5 +1,5 @@
 import {loadGlb} from './core/glb.js?v=060';
-import {ArmyRenderer} from './core/renderer.js?v=077';
+import {ArmyRenderer} from './core/renderer.js?v=078';
 import {RigAnimator} from './characters/rigAnimator.js?v=077';
 import {CAMP,moveWithCollision} from './map/camp.js?v=072';
 import {drawMinimap} from './ui/minimap.js?v=076';
