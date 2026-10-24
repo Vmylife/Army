@@ -39,7 +39,7 @@ function groundLift(asset,actor){
 export class ArmyRenderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
  this.uniforms={vp:gl.getUniformLocation(this.p,'uVP'),model:gl.getUniformLocation(this.p,'uModel'),bones:gl.getUniformLocation(this.p,'uBones[0]'),tex:gl.getUniformLocation(this.p,'uTexture')};
- this.flatVP=gl.getUniformLocation(this.pFlat,'uVP');this.vp=I;this.cameraYaw=.67;this.cameraPitch=.60;this.cameraZoom=9;this.cameraTarget={x:0,z:0};this.size={w:0,h:0};
+ this.flatVP=gl.getUniformLocation(this.pFlat,'uVP');this.vp=I;this.cameraYaw=.67;this.cameraPitch=.60;this.cameraZoom=9;this.cameraTarget={x:0,z:0};this.cameraTargetReady=false;this.size={w:0,h:0};
  }
  async addModel(name,gltf){const gl=this.gl,pr=gltf.json.meshes[0].primitives[0],vao=gl.createVertexArray();gl.bindVertexArray(vao);
   const map=[['POSITION',0,3],['NORMAL',1,3],['TEXCOORD_0',2,2],['JOINTS_0',3,4],['WEIGHTS_0',4,4]];
@@ -59,13 +59,20 @@ export class ArmyRenderer{
  }
  setCamera(opts){Object.assign(this,{cameraYaw:opts.yaw??this.cameraYaw,cameraPitch:opts.pitch??this.cameraPitch,cameraZoom:opts.zoom??this.cameraZoom})}
  startFrame(target){const gl=this.gl,canvas=this.canvas,ratio=Math.min(window.armyEco?1:1.65,window.devicePixelRatio||1),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
- gl.clearColor(.76,.84,.73,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
- const portrait=w/h<.94,dist=this.cameraZoom*(portrait?1.23:1),yaw=this.cameraYaw,pitch=this.cameraPitch;this.cameraTarget.x+=(target.x-this.cameraTarget.x)*.10;this.cameraTarget.z+=(target.z-this.cameraTarget.z)*.10;
+ gl.clearColor(.76,.84,.73,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);this.characterPass=false;gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
+ const portrait=w/h<.94,dist=this.cameraZoom*(portrait?1.08:1),yaw=this.cameraYaw,pitch=this.cameraPitch;
+ // Initialize on the player immediately; camera must not be left looking at the old world origin.
+ if(!this.cameraTargetReady){this.cameraTarget={x:target.x,z:target.z};this.cameraTargetReady=true;}
+ this.cameraTarget.x+=(target.x-this.cameraTarget.x)*.28;
+ this.cameraTarget.z+=(target.z-this.cameraTarget.z)*.28;
  const ex=this.cameraTarget.x+Math.sin(yaw)*Math.cos(pitch)*dist,ey=.9+Math.sin(pitch)*dist,ez=this.cameraTarget.z+Math.cos(yaw)*Math.cos(pitch)*dist;
- this.vp=mul(perspective(portrait?Math.PI/3.7:Math.PI/4.15,w/h,.1,150),lookAt([ex,ey,ez],[this.cameraTarget.x,.65,this.cameraTarget.z]));
+ this.vp=mul(perspective(portrait?Math.PI/3.7:Math.PI/4.15,w/h,.1,150),lookAt([ex,ey,ez],[this.cameraTarget.x,.83,this.cameraTarget.z]));
  gl.useProgram(this.pFlat);gl.uniformMatrix4fv(this.flatVP,false,this.vp);gl.bindVertexArray(this.flatVAO);gl.drawArrays(gl.TRIANGLES,0,this.environment.count);
  }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
+ // The first-person exploration prototype must never lose the character behind roofs
+ // or tall objects. Draw characters with a clean depth buffer after the map pass.
+ if(!this.characterPass){gl.clear(gl.DEPTH_BUFFER_BIT);this.characterPass=true;}
  gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,groundLift(a,actor),actor.pos.z),rotateY(actor.angle)));
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  }
