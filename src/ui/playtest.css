@@ -1,0 +1,21 @@
+:root{--ink:#274c3a;--leaf:#b7c9b2}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--leaf);font-family:ui-rounded,"PingFang TC",-apple-system,system-ui,sans-serif;color:var(--ink);touch-action:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer}
+#world{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#minimap{position:fixed;z-index:3;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));width:126px;height:126px;border:3px solid #fffbdf;border-radius:50%;overflow:hidden;pointer-events:none;filter:drop-shadow(0 4px 7px #233d303e);background:#a4b99b}
+#minimap canvas{width:100%;height:100%;display:block}
+#floatingStick{position:fixed;z-index:5;left:50%;top:70%;width:132px;height:132px;transform:translate(-50%,-50%) scale(.9);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 80ms ease,transform 80ms ease,visibility 80ms}
+#floatingStick.active{visibility:visible;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.stick-base{width:100%;height:100%;border:2px solid #f6ffecb0;border-radius:50%;display:grid;place-items:center;background:#31564557;box-shadow:0 3px 22px #213c2c4d,inset 0 0 14px #d5e7b638}
+.stick-thumb{width:54px;height:54px;border-radius:50%;border:3px solid #fffff5d8;background:#f1f8e7e8;box-shadow:0 4px 12px #14291e42;will-change:transform}
+#floatingStick.run .stick-thumb{background:#ddeaafe8}
+#floatingStick.sprint .stick-thumb{background:#ffd9a5ea}
+#notice,#fatal{position:fixed;z-index:20;left:50%;top:47%;transform:translate(-50%,-50%);max-width:min(88vw,400px);width:max-content;min-width:190px;padding:17px 23px;background:#fff9eded;border-radius:19px;text-align:center;font-weight:700;box-shadow:0 7px 22px #37573a2b}
+#fatal{width:min(88vw,420px);color:#8d4138}
+#fatal strong{display:block;font-size:18px;margin-bottom:8px}
+#fatal p{overflow-wrap:anywhere;white-space:pre-wrap;font-size:13px;font-weight:500;line-height:1.6}
+#fatal button{border:none;padding:10px 17px;border-radius:12px;background:#42654f;color:white;font-weight:700}
+#notice[hidden],#fatal[hidden],#debug[hidden]{display:none}
+#debug{position:fixed;z-index:8;left:8px;bottom:calc(env(safe-area-inset-bottom) + 12px);padding:8px 10px;border-radius:7px;background:#18352ccb;color:#fff;font:11px/1.5 monospace;pointer-events:none;white-space:pre-wrap}
+@media(orientation:landscape){#minimap{width:105px;height:105px;top:calc(env(safe-area-inset-top,0px) + 8px)}#floatingStick{width:115px;height:115px}.stick-thumb{width:47px;height:47px}}
