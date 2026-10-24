@@ -1,4 +1,4 @@
-// Army v0.7 — single source of truth for 3D camp, collisions, minimap and full map.
+// Army v0.8.1 — single source of truth for 3D camp, collisions, minimap and full map.
 // Coordinates: +X = east/right of reference plan, +Z = north/top.
 export const CAMP = {
   width: 96, depth: 55,
@@ -98,3 +98,49 @@ export function moveWithCollision(pos,dx,dz){
  const first=clampPos({x:pos.x+dx,z:pos.z});const out=can(first)?first:pos;
  const second=clampPos({x:out.x,z:out.z+dz});return can(second)?second:out;
 }
+
+
+// Decorative static props. These are visual polish only; they share a few low-poly
+// GLBs and are scattered across the camp to make roads, ranges and building corners
+// feel less empty.
+export const PROPS = [
+  // Entrance / main avenue lamps
+  {type:'streetlamp',x:0.0,z:-19.6,scale:4.1,yaw:0,cull:70},
+  {type:'streetlamp',x:0.0,z:-10.5,scale:4.1,yaw:0,cull:70},
+  {type:'streetlamp',x:0.0,z:-1.2,scale:4.1,yaw:0,cull:70},
+  {type:'streetlamp',x:0.0,z:8.0,scale:4.1,yaw:0,cull:70},
+  {type:'streetlamp',x:-9.6,z:14.4,scale:4.0,yaw:1.57,cull:65},
+  {type:'streetlamp',x:31.4,z:-2.2,scale:4.0,yaw:1.57,cull:65},
+  {type:'streetlamp',x:35.2,z:3.4,scale:4.0,yaw:0,cull:65},
+
+  // Trees around perimeter / hill
+  {type:'treeA',x:-41.8,z:-16.6,scale:4.0,yaw:0.2,cull:80},
+  {type:'treeB',x:-43.1,z:-7.2,scale:4.1,yaw:-0.6,cull:80},
+  {type:'treeA',x:-42.3,z:2.0,scale:3.8,yaw:0.9,cull:80},
+  {type:'treeB',x:-35.8,z:13.2,scale:4.0,yaw:0.3,cull:80},
+  {type:'treeA',x:-22.2,z:21.3,scale:4.2,yaw:-0.2,cull:80},
+  {type:'treeB',x:8.0,z:24.2,scale:4.2,yaw:0.1,cull:80},
+  {type:'treeA',x:23.8,z:23.4,scale:4.0,yaw:0.0,cull:80},
+  {type:'treeB',x:37.8,z:10.1,scale:3.9,yaw:0.45,cull:80},
+  {type:'treeA',x:38.4,z:-15.8,scale:4.0,yaw:-0.4,cull:80},
+
+  // Range / battle training decorations
+  {type:'sandbag',x:2.3,z:3.2,scale:2.3,yaw:0.0,cull:60},
+  {type:'sandbag',x:22.1,z:3.2,scale:2.3,yaw:3.14,cull:60},
+  {type:'sandbag',x:-24.6,z:-10.2,scale:2.3,yaw:1.57,cull:60},
+  {type:'target',x:4.8,z:18.7,scale:1.55,yaw:3.14,cull:65},
+  {type:'target',x:10.6,z:18.7,scale:1.55,yaw:3.14,cull:65},
+  {type:'target',x:16.4,z:18.7,scale:1.55,yaw:3.14,cull:65},
+
+  // Storage props around buildings
+  {type:'crate',x:7.8,z:-14.1,scale:1.05,yaw:0.25,cull:55},
+  {type:'barrel',x:5.8,z:-14.7,scale:0.95,yaw:-0.35,cull:55},
+  {type:'crate',x:21.0,z:18.7,scale:1.0,yaw:0.12,cull:55},
+  {type:'barrel',x:24.0,z:18.5,scale:0.95,yaw:-0.2,cull:55},
+  {type:'crate',x:33.8,z:5.0,scale:1.0,yaw:-0.25,cull:55},
+  {type:'barrel',x:35.7,z:5.5,scale:0.95,yaw:0.18,cull:55},
+  {type:'crate',x:-35.8,z:-10.9,scale:1.05,yaw:0.2,cull:55},
+  {type:'barrel',x:-34.2,z:-12.8,scale:0.95,yaw:0.0,cull:55},
+  {type:'crate',x:27.0,z:-13.2,scale:1.0,yaw:0.0,cull:55},
+  {type:'barrel',x:-5.8,z:-13.6,scale:0.9,yaw:0.0,cull:55}
+];

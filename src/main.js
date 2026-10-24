@@ -1,8 +1,9 @@
-import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=079';
+import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=081';
+import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=081';
 import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=079';
 import {RigAnimator} from './characters/rigAnimator.js?v=077';
-import {CAMP,moveWithCollision} from './map/camp.js?v=072';
+import {CAMP,moveWithCollision} from './map/camp.js?v=081';
 import {drawMinimap} from './ui/minimap.js?v=076';
 import {initWorldMap} from './ui/worldMap.js?v=076';
 import {setupInput} from './ui/input.js?v=062';
@@ -41,6 +42,12 @@ async function boot(){
    await buildings.add(model.id,glb);
   })).then(()=>console.info('九棟 Meshy 建築完成載入'))
      .catch(err=>{console.error('建築載入失敗',err);status('部分建築載入失敗，請確認 assets/buildings 已完整上傳');setTimeout(()=>status(''),6500)});
+  const props=new CampProps(renderer.gl);
+  const propsReady=Promise.all(PROP_MODELS.map(async model=>{
+   const glb=await stage(loadGlb(model.url),'道具 '+model.id,120000);
+   await props.add(model.id,glb);
+  })).then(()=>console.info('軍營裝飾道具完成載入'))
+     .catch(err=>{console.error('道具載入失敗',err);status('部分道具載入失敗，請確認 assets/props 已完整上傳');setTimeout(()=>status(''),6500)});
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
   player.anim.setClip('Idle');player.anim.evaluate(0);
   let foe=null;
@@ -102,6 +109,7 @@ async function boot(){
     }
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
     buildings.draw(renderer.vp,player.pos);
+    props.draw(renderer.vp,player.pos);
     renderer.drawActor('recruit',player);
     if(foe)renderer.drawActor('red',foe);
 

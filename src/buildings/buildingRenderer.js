@@ -1,7 +1,7 @@
 // Army 0.7.9 — three shared Meshy buildings, nine camp locations.
 // Textured static GLBs are uploaded once per type, while each campus instance
 // has its own scale, rotation and a subtle identifying wall-color tint.
-import {BUILDINGS} from '../map/camp.js?v=072';
+import {BUILDINGS} from '../map/camp.js?v=081';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 const PLAN={
@@ -12,9 +12,9 @@ const PLAN={
  chem:{type:3,tint:[.82,1.11,1.03]}
 };
 export const BUILDING_MODELS=[
- {id:1,url:'./assets/buildings/building-1-barracks.glb?v=079'},
- {id:2,url:'./assets/buildings/building-2-community.glb?v=079'},
- {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=080'}
+ {id:1,url:'./assets/buildings/building-1-barracks.glb?v=081'},
+ {id:2,url:'./assets/buildings/building-2-community.glb?v=081'},
+ {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=081'}
 ];
 // Meshy output is front-facing +Z. Follow each actual doorway/interaction waypoint.
 function faceAngle(b){
