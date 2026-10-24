@@ -1,5 +1,5 @@
-// Army v0.7.5 — Both maps use one camera-aligned cartographic projection.
-// World coordinate sources remain unchanged. Only render orientation is transformed.
+// Army v0.7.6 — shared world geometry, independently chosen map orientation.
+// Minimap is camera-aligned; full map uses a constant heading based on screenshot.
 import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=072';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
@@ -30,6 +30,9 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  };
  const dot=(x,z,r,c)=>{ctx.beginPath();ctx.arc(px(x),py(z),r,0,2*Math.PI);ctx.fillStyle=c;ctx.fill()};
  ctx.clearRect(0,0,width,height);
+ // Always fill the screen before applying rotation/mirroring, so the background
+ // doesn't get clipped to half the canvas when the fixed large-map yaw is PI.
+ ctx.fillStyle='#e9e6d6';ctx.fillRect(0,0,width,height);
  ctx.save();
  if(mini){ctx.beginPath();ctx.arc(width/2,height/2,width*.487,0,Math.PI*2);ctx.clip();}
  {
@@ -41,7 +44,6 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
   ctx.transform(c,s,s,-c,0,0);
   ctx.translate(-width/2,-height/2);
  }
- ctx.fillStyle='#e9e6d6';ctx.fillRect(0,0,width,height);
  poly(PERIMETER,'#aec79d','#435c4c',Math.max(1.1,scale*.24));
  // Foothills on the northern boundary are part of the plan.
  ctx.beginPath();ctx.moveTo(px(-13),py(25));ctx.bezierCurveTo(px(-4),py(28),px(3),py(25),px(10),py(27));ctx.lineTo(px(21),py(24));ctx.strokeStyle='#799477';ctx.lineWidth=mini?1.5:2;ctx.stroke();
@@ -76,6 +78,31 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  if(enemy){dot(enemy.x,enemy.z,mini?4.3:5,'#d45457');ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px(enemy.x),py(enemy.z),mini?4.3:5,0,Math.PI*2);ctx.stroke()}
  // Finish the shared map projection before painting HUD markers/text.
  ctx.restore();
+ if(mini){
+  // Crisp upright names placed directly over nearby buildings, not rotated
+  // or mirrored with the map. Avoid covering the player marker and each other.
+  const names={barracks:'營舍',office:'中山室',ammo:'彈藥庫',chem:'毒氣室',shop:'營站',
+   canteen:'餐廳',wash:'洗碗區',medic:'醫務所',armory:'軍械室',visitor:'會客室',guard:'崗哨'};
+  const radarR=width*.487, cx=width/2,cy=height/2;
+  const close=BUILDINGS.map(b=>({b,label:names[b.kind]||b.label,pt:projected(b.x,b.z)}))
+   .sort((a,b)=>Math.hypot(a.pt[0]-cx,a.pt[1]-cy)-Math.hypot(b.pt[0]-cx,b.pt[1]-cy));
+  const boxes=[];
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,radarR,0,Math.PI*2);ctx.clip();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`700 ${Math.round(width*.083)}px system-ui,"PingFang TC",sans-serif`;
+  for(const item of close){
+   const [tx,ty]=item.pt;const textWidth=ctx.measureText(item.label).width;
+   const halfW=textWidth/2+5,halfH=width*.054;
+   if(Math.hypot(tx-cx,ty-cy)>radarR-halfW*.65)continue;
+   if(Math.hypot(tx-cx,ty-cy)<width*.105)continue;
+   const box=[tx-halfW,ty-halfH,tx+halfW,ty+halfH];
+   if(boxes.some(v=>box[0]<v[2]+3&&box[2]>v[0]-3&&box[1]<v[3]+3&&box[3]>v[1]-3))continue;
+   boxes.push(box);
+   ctx.fillStyle='rgba(250,247,227,.91)';ctx.fillRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
+   ctx.fillStyle='#284e3e';ctx.fillText(item.label,tx,ty+.5);
+  }
+  ctx.restore();
+ }
  if(!mini){
   const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43,-4],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2]];
   for(const [name,x,z] of names){const [sx,sy]=projected(x,z);const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,sx,sy);ctx.fillStyle='#344c3b';ctx.fillText(name,sx,sy)}

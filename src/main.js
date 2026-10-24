@@ -2,8 +2,8 @@ import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=072';
 import {RigAnimator} from './characters/rigAnimator.js?v=060';
 import {CAMP,moveWithCollision} from './map/camp.js?v=072';
-import {drawMinimap} from './ui/minimap.js?v=075';
-import {initWorldMap} from './ui/worldMap.js?v=075';
+import {drawMinimap} from './ui/minimap.js?v=076';
+import {initWorldMap} from './ui/worldMap.js?v=076';
 import {setupInput} from './ui/input.js?v=062';
 import {createLodShowcase} from './ui/lodShowcase.js?v=075';
 import {options} from './systems/settings.js?v=060';
@@ -81,7 +81,12 @@ async function boot(){
     if(foe)renderer.drawActor('red',foe);
     lodShowcase.draw(dt,player.pos);
     mapFacing=Math.PI-player.angle+mapYaw;
-    if(now-lastMap>100){drawMinimap(player.pos,foe?.pos||null,false,mapFacing,mapYaw);worldMap.update(player.pos,foe?.pos||null,mapFacing,mapYaw);lastMap=now}
+    // 60 Hz radar refresh (previously 10 Hz). World-map preview refreshes only while open.
+    if(now-lastMap>=16){
+      if(!worldMap.isOpen())drawMinimap(player.pos,foe?.pos||null,false,mapFacing,mapYaw);
+      worldMap.update(player.pos,foe?.pos||null,player.angle);
+      lastMap=now;
+    }
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`mode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
     requestAnimationFrame(tick);
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}

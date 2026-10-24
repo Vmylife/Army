@@ -47,3 +47,14 @@ button{font:inherit;cursor:pointer}
 /* v0.7 - blueprint-wide map. Preserve full view rather than squeezing to square. */
 .map-canvas-holder{aspect-ratio:96 / 55;max-height:50%;flex-shrink:0}
 @media(orientation:landscape){.map-canvas-holder{aspect-ratio:96 / 55;max-height:none;max-width:68%}}
+
+/* v0.7.6: large map = map only, no location list or footer legend. */
+.world-map-panel{height:auto;max-height:calc(100dvh - 24px);width:min(96vw,680px,calc((100dvh - 105px)*1.745));}
+.world-map-body{flex:none;display:block;margin:0 10px 10px;overflow:hidden;}
+.map-canvas-holder{width:100%;height:auto;max-height:none;max-width:100%;aspect-ratio:96 / 55;}
+.world-map-places,.world-map-footer{display:none!important;}
+@media (orientation:landscape){
+ .world-map-panel{height:auto;width:min(94vw,900px,calc((100dvh - 105px)*1.745));}
+ .world-map-body{display:block;}
+ .map-canvas-holder{width:100%;height:auto;max-height:none;max-width:100%;aspect-ratio:96 / 55;}
+}
