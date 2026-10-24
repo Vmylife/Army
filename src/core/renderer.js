@@ -45,6 +45,26 @@ function makeEnvironment(){const verts=[],cols=[],norms=[];
  for(const [x,z] of [[-2.3,.6],[2.45,2.5],[.95,-4.2]]){cube(x,0,z,.55,.42,.52,[.60,.65,.52]);cube(x,.39,z,.58,.07,.55,[.75,.73,.62])}
  return{verts:new Float32Array(verts),cols:new Float32Array(cols),norms:new Float32Array(norms),count:verts.length/3};
 }
+// Meshy hit / fall / stand-up clips contain negative root translations.
+// Lift only these actions so their lowest sampled point never passes the floor.
+const FLOOR_ACTIONS=new Set(['Dead','Arise','BeHit_FlyUp']);
+function groundLift(asset,actor){
+ const anim=actor.anim;
+ if(!FLOOR_ACTIONS.has(anim.clip)&&!(anim.transition>0&&FLOOR_ACTIONS.has(anim.prevClip)))return 0;
+ const bones=anim.bones;
+ let low=Infinity;
+ for(const sample of asset.sample){
+  const [x,y,z]=sample.p;
+  let yy=0;
+  for(let i=0;i<4;i++){
+   const weight=sample.w[i];if(weight<=0)continue;
+   const base=sample.j[i]*16;
+   yy+=weight*(bones[base+1]*x+bones[base+5]*y+bones[base+9]*z+bones[base+13]);
+  }
+  if(yy<low)low=yy;
+ }
+ return Number.isFinite(low)?Math.max(0,.015-low):0;
+}
 export class ArmyRenderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
  this.uniforms={vp:gl.getUniformLocation(this.p,'uVP'),model:gl.getUniformLocation(this.p,'uModel'),bones:gl.getUniformLocation(this.p,'uBones[0]'),tex:gl.getUniformLocation(this.p,'uTexture')};
@@ -61,7 +81,7 @@ export class ArmyRenderer{
   // without editing the supplied rig or animation curves.
   const positions=gltf.read(pr.attributes.POSITION), joints=gltf.read(pr.attributes.JOINTS_0),weights=gltf.read(pr.attributes.WEIGHTS_0);
   const total=positions.length/3,groundSamples=[];
-  for(let i=0;i<total;i+=Math.max(1,Math.floor(total/185))){groundSamples.push(i)}
+  for(let i=0;i<total;i+=Math.max(1,Math.floor(total/420))){groundSamples.push(i)}
   const low=[...Array(total).keys()].sort((a,b)=>positions[a*3+1]-positions[b*3+1]).slice(0,32);groundSamples.push(...low);
   const sample=groundSamples.map(i=>({p:[positions[i*3],positions[i*3+1],positions[i*3+2]],j:[...joints.slice(i*4,i*4+4)],w:[...weights.slice(i*4,i*4+4)]}));
   this.assets.set(name,{vao,tex,count:inds.length,indexType:idxAcc.componentType,sample});
@@ -75,7 +95,7 @@ export class ArmyRenderer{
  gl.useProgram(this.pFlat);gl.uniformMatrix4fv(this.flatVP,false,this.vp);gl.bindVertexArray(this.flatVAO);gl.drawArrays(gl.TRIANGLES,0,this.environment.count);
  }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
- gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,0,actor.pos.z),rotateY(actor.angle)));
+ gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,groundLift(a,actor),actor.pos.z),rotateY(actor.angle)));
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  }
 }

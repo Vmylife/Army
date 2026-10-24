@@ -1,6 +1,6 @@
 import {loadGlb} from './core/glb.js';
-import {ArmyRenderer} from './core/renderer.js';
-import {RigAnimator} from './characters/rigAnimator.js';
+import {ArmyRenderer} from './core/renderer.js?v=041';
+import {RigAnimator} from './characters/rigAnimator.js?v=041';
 import {CAMP,FEATURES,clampPos} from './map/camp.js';
 import {setupInput,setupAnimationButtons} from './ui/input.js';
 import {createEncounter} from './battle/encounter.js';
@@ -33,8 +33,9 @@ async function boot(){let renderer;try{
  banner('✅ 進入軍營！左下搖桿走路',2200);
  let last=performance.now(),fpsAt=last,frames=0,foePhase=0,lastLoc='',lastMoving=false,lastFrame=0;
  function loop(now){const dt=Math.min(.045,(now-last)/1000);last=now;const dir=input(),mag=Math.hypot(dir.x,dir.y);
-  if(player.anim.clip==='BeHit_FlyUp'&&player.anim.finished())player.anim.setClip('Arise',{restart:true});
-  if(player.anim.clip==='Boxing_Practice'&&player.anim.finished())player.anim.setClip('Arise',{restart:true});
+  if(player.anim.clip==='BeHit_FlyUp'&&player.anim.finished())player.anim.setClip('Idle');
+  if(player.anim.clip==='Boxing_Practice'&&player.anim.finished())player.anim.setClip('Idle');
+  if(player.anim.clip==='Arise'&&player.anim.finished())player.anim.setClip('Idle');
   if(mag>.1&&player.anim.clip!=='Dead'&&player.anim.clip!=='BeHit_FlyUp'){
     const mode=options.playerMode,speed=(mode==='Running'||mode==='RunFast'?options.runSpeed:options.moveSpeed),c=Math.cos(camYaw),s=Math.sin(camYaw);
     // Camera-relative controls; correct character forward is model-local +Z.
@@ -43,7 +44,7 @@ async function boot(){let renderer;try{
     if(!inBuilding(next))player.pos=next;
     setDirection(player,mx,mz);if(player.anim.clip!==mode)player.anim.setClip(mode);
     lastMoving=true;
-  }else if(lastMoving){lastMoving=false;if(actions.locomotion.has(player.anim.clip))player.anim.setClip('Arise');}
+  }else if(lastMoving){lastMoving=false;if(actions.locomotion.has(player.anim.clip))player.anim.setClip('Idle');}
   player.anim.evaluate(dt);
   if(!encounter.dead){
    if(foe.anim.clip==='BeHit_FlyUp'&&foe.anim.finished())foe.anim.setClip('Casual_Walk');

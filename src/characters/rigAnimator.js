@@ -1,5 +1,5 @@
 import {I,mul,trs} from '../core/math.js';
-const LOOP=new Set(['Walking','Running','Casual_Walk','RunFast','Run_03','Boxing_Practice']);
+const LOOP=new Set(['Idle','Walking','Running','Casual_Walk','RunFast','Run_03']);
 const ease=(a,b,t)=>a+(b-a)*t;
 function lerpQuat(a,b,t){let dot=a.reduce((sum,v,i)=>sum+v*b[i],0);const bv=dot<0?b.map(x=>-x):b;let q=a.map((v,i)=>ease(v,bv[i],t));const len=Math.hypot(...q)||1;return q.map(x=>x/len)}
 function readTrack(t,x,quat=false){const {times,values,width,interpolation}=t;const n=times.length;
@@ -8,10 +8,25 @@ function readTrack(t,x,quat=false){const {times,values,width,interpolation}=t;co
  const a=Array.from(values.subarray(lo*width,(lo+1)*width));const b=Array.from(values.subarray(hi*width,(hi+1)*width));if(interpolation==='STEP')return a;
  const f=(x-times[lo])/(times[hi]-times[lo]);return quat?lerpQuat(a,b,f):a.map((v,i)=>ease(v,b[i],f));
 }
+// The exported model has no Idle animation. Build a still standing pose by
+// averaging two opposite phases of its Walking cycle. Unlike the last pose of
+// Arise, this keeps the hips at ordinary standing height, avoiding floor sinks.
+function buildIdleClip(walk){
+ const tracks=new Map();
+ for(const [key,track] of walk.tracks){
+  const quat=key.endsWith('/rotation');
+  const a=readTrack(track,walk.duration*.10,quat);
+  const b=readTrack(track,walk.duration*.60,quat);
+  const pose=quat?lerpQuat(a,b,.5):a.map((v,i)=>(v+b[i])*.5);
+  tracks.set(key,{times:new Float32Array([0]),values:new Float32Array(pose),width:track.width,interpolation:'STEP'});
+ }
+ return {duration:1,tracks};
+}
 export class RigAnimator{
  constructor(gltf){this.gltf=gltf;this.j=gltf.json;this.nodes=this.j.nodes;this.inverse=this.j.skins[0].inverseBindMatrices!==undefined?gltf.read(this.j.skins[0].inverseBindMatrices):null;this.joints=this.j.skins[0].joints;this.parents=new Map();this.nodes.forEach((n,i)=>{for(const c of n.children||[])this.parents.set(c,i)});this.meshIndex=this.nodes.findIndex(n=>n.mesh!==undefined);
  this.clips={};for(const anim of this.j.animations||[]){let max=0;const tracks=new Map();for(const c of anim.channels){const s=anim.samplers[c.sampler],times=gltf.read(s.input),values=gltf.read(s.output),path=c.target.path;max=Math.max(max,times[times.length-1]||0);tracks.set(`${c.target.node}/${path}`,{times,values,width:path==='rotation'?4:3,interpolation:s.interpolation||'LINEAR'})}this.clips[anim.name]={duration:max,tracks}}
- this.clip='Arise';this.clock=999;this.speed=1;this.bones=new Float32Array(this.joints.length*16);this.globals=new Map();this.prevClip=null;this.transition=0;this.prevTime=0;this.completed=false;
+ this.clips.Idle=buildIdleClip(this.clips.Walking||this.clips.Casual_Walk);
+ this.clip='Idle';this.clock=0;this.speed=1;this.bones=new Float32Array(this.joints.length*16);this.globals=new Map();this.prevClip=null;this.transition=0;this.prevTime=0;this.completed=false;
  }
  setClip(name,{restart=false}={}){if(!this.clips[name])return false;if(this.clip===name&&!restart)return true;
  this.prevClip=this.clip;this.prevTime=this.clock;this.transition=.18;this.clip=name;this.clock=0;this.completed=false;return true}
