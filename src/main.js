@@ -4,7 +4,7 @@ import {RigAnimator} from './characters/rigAnimator.js?v=041';
 import {CAMP,moveWithCollision} from './map/camp.js?v=050';
 import {drawMinimap} from './ui/minimap.js?v=052';
 import {setupInput} from './ui/input.js?v=051';
-import {options} from './systems/settings.js?v=051';
+import {options} from './systems/settings.js?v=053';
 const $=id=>document.getElementById(id);
 const notice=(s)=>{const el=$('notice');if(!s){el.hidden=true;return;}el.textContent=s;el.hidden=false};
 function setDirection(actor,x,z){
@@ -12,6 +12,8 @@ function setDirection(actor,x,z){
  actor.angle+=diff*.21;
 }
 function motion(strength,lastMode){
+ // Defensive clamp: never allow invalid stick intensity to poison bone matrices.
+ strength=Number.isFinite(strength)?Math.max(0,Math.min(1,strength)):0;
  if(strength<options.walkThreshold)return {mode:'Idle',speed:0,animationSpeed:1};
  // Small hysteresis to avoid flicker when a thumb rests exactly on a threshold.
  const runCut=lastMode==='Running'||lastMode==='RunFast'?options.runThreshold-.045:options.runThreshold+.025;
