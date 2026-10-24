@@ -5,18 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#b8cbb1">
   <title>國軍模擬器｜大型軍營</title>
-  <link rel="stylesheet" href="./src/ui/playtest.css?v=054">
+  <link rel="stylesheet" href="./src/ui/playtest.css?v=055">
 </head>
 <body>
-  <canvas id="world" aria-label="3D 軍營地圖：螢幕中下方滑動移動，螢幕上方拖曳旋轉鏡頭"></canvas>
+  <canvas id="world" aria-label="3D 軍營"></canvas>
   <aside id="minimap" class="minimap" aria-label="角色置中的旋轉小地圖">
-    <canvas id="miniCanvas" width="224" height="224" aria-label="軍營方向雷達：箭頭朝上，地圖隨角色轉向"></canvas>
+    <canvas id="miniCanvas" width="224" height="224" aria-label="軍營方向雷達"></canvas>
   </aside>
-  <div id="floatingStick" class="floating-stick" aria-hidden="true">
-    <div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div>
-  </div>
+  <div id="floatingStick" class="floating-stick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
   <div id="notice" class="notice" hidden></div>
   <div id="fatal" class="fatal" hidden></div>
-  <script type="module" src="./src/main.js?v=054"></script>
+  <script type="module" src="./src/main.js?v=055"></script>
 </body>
 </html>
