@@ -1,8 +1,8 @@
 import {loadGlb} from './core/glb.js';
-import {ArmyRenderer} from './core/renderer.js?v=050';
+import {ArmyRenderer} from './core/renderer.js?v=052';
 import {RigAnimator} from './characters/rigAnimator.js?v=041';
 import {CAMP,moveWithCollision} from './map/camp.js?v=050';
-import {drawMinimap} from './ui/minimap.js?v=051';
+import {drawMinimap} from './ui/minimap.js?v=052';
 import {setupInput} from './ui/input.js?v=051';
 import {options} from './systems/settings.js?v=051';
 const $=id=>document.getElementById(id);
@@ -41,8 +41,8 @@ async function boot(){
   const foe={pos:{...CAMP.enemySpawn},angle:Math.PI,anim:new RigAnimator(foeGltf)};
   const enemyIdle=foe.anim.hasClip('Idle')?'Idle':'Casual_Walk';
   foe.anim.setClip(enemyIdle);
-  let camYaw=.66,camPitch=.69,zoom=options.zoom;
-  const input=setupInput($('world'),(dx,dy)=>{camYaw+=dx;camPitch=Math.max(.32,Math.min(1.14,camPitch+dy));});
+  let camYaw=.66,camPitch=.82,zoom=8.4;
+  const input=setupInput($('world'),(dx,dy)=>{camYaw+=dx;camPitch=Math.max(.32,Math.min(1.09,camPitch+dy));});
   notice('');
   let last=performance.now(),foePhase=0,lastMapFrame=0,lastMode='Idle';
   function loop(now){
@@ -78,7 +78,7 @@ async function boot(){
    renderer.startFrame(player.pos);
    renderer.drawActor('recruit',player);
    renderer.drawActor('red',foe);
-   if(now-lastMapFrame>250){lastMapFrame=now;drawMinimap(player.pos,foe.pos,false)}
+   if(now-lastMapFrame>70){lastMapFrame=now;drawMinimap(player.pos,foe.pos,false,player.angle)}
    requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
