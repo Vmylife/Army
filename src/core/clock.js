@@ -1,0 +1,1 @@
+export class TrainingClock{constructor(duration=360){this.duration=duration;this.remaining=duration;this.paused=false;}tick(dt){if(!this.paused)this.remaining=Math.max(0,this.remaining-dt);return this.remaining;}reset(){this.remaining=this.duration;}}
