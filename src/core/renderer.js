@@ -9,14 +9,6 @@ void main(){ivec4 ji=ivec4(j+0.5);mat4 skin=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uB
 const SKIN_FS=`#version 300 es
 precision mediump float;in vec2 vUV;in vec3 vN;in vec3 vPos;uniform sampler2D uTexture;out vec4 frag;
 void main(){vec3 base=texture(uTexture,vUV).rgb;float sun=max(0.,dot(normalize(vN),normalize(vec3(-0.4,1.1,0.55))));float light=.78+.25*sun;frag=vec4(base*light,1.);}`;
-// Compatibility fallback: display the imported model in its bind pose if a device
-// silently fails the GPU skinning path. Normal animation remains the default.
-const AVATAR_STATIC_VS=`#version 300 es
-precision highp float;
-layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec2 uv;
-uniform mat4 uVP,uModel;
-out vec2 vUV;out vec3 vN;out vec3 vPos;
-void main(){vec4 wp=uModel*vec4(p,1.0);gl_Position=uVP*wp;vUV=uv;vN=normalize(mat3(uModel)*n);vPos=wp.xyz;}`;
 const STATIC_VS=`#version 300 es
 precision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 c;layout(location=2)in vec3 n;uniform mat4 uVP;out vec3 vColor;out vec3 vN;void main(){gl_Position=uVP*vec4(p,1.);vColor=c;vN=n;}`;
 const STATIC_FS=`#version 300 es
@@ -45,30 +37,64 @@ function groundLift(asset,actor){
  return Number.isFinite(low)?Math.max(0,.015-low):0;
 }
 export class ArmyRenderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pAvatarStatic=program(gl,AVATAR_STATIC_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
  this.uniforms={vp:gl.getUniformLocation(this.p,'uVP'),model:gl.getUniformLocation(this.p,'uModel'),bones:gl.getUniformLocation(this.p,'uBones[0]'),tex:gl.getUniformLocation(this.p,'uTexture')};
- this.avatarStaticUniforms={vp:gl.getUniformLocation(this.pAvatarStatic,'uVP'),model:gl.getUniformLocation(this.pAvatarStatic,'uModel'),tex:gl.getUniformLocation(this.pAvatarStatic,'uTexture')};
- this.avatarRenderMode='probe';this.avatarRenderIssue='';
  this.flatVP=gl.getUniformLocation(this.pFlat,'uVP');this.vp=I;this.cameraYaw=.67;this.cameraPitch=.60;this.cameraZoom=9;this.cameraTarget={x:0,z:0};this.cameraTargetReady=false;this.size={w:0,h:0};
  }
  async addModel(name,gltf){const gl=this.gl,pr=gltf.json.meshes[0].primitives[0],vao=gl.createVertexArray();gl.bindVertexArray(vao);
   const map=[['POSITION',0,3],['NORMAL',1,3],['TEXCOORD_0',2,2],['JOINTS_0',3,4],['WEIGHTS_0',4,4]];
   for(const [k,loc,size] of map){const idx=pr.attributes[k],acc=gltf.json.accessors[idx];attrib(gl,loc,gltf.read(idx),size,acc.componentType)}
   const idxAcc=gltf.json.accessors[pr.indices],inds=gltf.read(pr.indices),buf=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buf);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,inds,gl.STATIC_DRAW);gl.bindVertexArray(null);
-  const material=gltf.json.materials[pr.material],tid=material.pbrMetallicRoughness.baseColorTexture.index,imgid=gltf.json.textures[tid].source,url=URL.createObjectURL(gltf.imageFrom(imgid));let image=new Image();try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url})}finally{URL.revokeObjectURL(url)}
-  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
-  
+  // Mobile-safe texture decode. An image loading failure must not abort the game.
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  let imageOK=false;
+  try{
+   const material=gltf.json.materials[pr.material];
+   const tid=material.pbrMetallicRoughness.baseColorTexture.index;
+   const imgid=gltf.json.textures[tid].source;
+   const blob=gltf.imageFrom(imgid);const url=URL.createObjectURL(blob);
+   try{
+    const image=new Image();image.decoding='async';
+    await new Promise((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(Error('貼圖解碼逾時')),10000);
+     image.onload=()=>{clearTimeout(timer);resolve()};
+     image.onerror=()=>{clearTimeout(timer);reject(Error('圖片解碼失敗'))};
+     image.src=url;
+    });
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+    imageOK=true;
+   }finally{URL.revokeObjectURL(url)}
+   if(!imageOK&&typeof createImageBitmap==='function'){
+    const bitmap=await createImageBitmap(blob);
+    try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);imageOK=true}
+    finally{bitmap.close?.()}
+   }
+  }catch(e){console.warn('貼圖載入問題，啟用單色備援：',name,String(e?.message||e))}
+  if(!imageOK){
+   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,
+     new Uint8Array(name==='red'?[177,60,60,255]:[115,137,97,255]));
+  }
+  if(imageOK){gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR)}
+  else gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+
   // Small CPU sample for ground contact: correct Meshy clip-specific root offsets
   // without editing the supplied rig or animation curves.
   const positions=gltf.read(pr.attributes.POSITION), joints=gltf.read(pr.attributes.JOINTS_0),weights=gltf.read(pr.attributes.WEIGHTS_0);
   const total=positions.length/3,groundSamples=[];
   for(let i=0;i<total;i+=Math.max(1,Math.floor(total/420))){groundSamples.push(i)}
-  const low=[...Array(total).keys()].sort((a,b)=>positions[a*3+1]-positions[b*3+1]).slice(0,32);groundSamples.push(...low);
+  const low=[];
+  for(let i=0;i<total;i++){if(low.length<32){low.push(i);low.sort((a,b)=>positions[b*3+1]-positions[a*3+1]);}
+   else if(positions[i*3+1]<positions[low[0]*3+1]){low[0]=i;low.sort((a,b)=>positions[b*3+1]-positions[a*3+1]);}}
+  groundSamples.push(...low);
   const sample=groundSamples.map(i=>({p:[positions[i*3],positions[i*3+1],positions[i*3+2]],j:[...joints.slice(i*4,i*4+4)],w:[...weights.slice(i*4,i*4+4)]}));
   this.assets.set(name,{vao,tex,count:inds.length,indexType:idxAcc.componentType,sample});
  }
  setCamera(opts){Object.assign(this,{cameraYaw:opts.yaw??this.cameraYaw,cameraPitch:opts.pitch??this.cameraPitch,cameraZoom:opts.zoom??this.cameraZoom})}
- startFrame(target){const gl=this.gl,canvas=this.canvas,ratio=Math.min(window.armyEco?1:1.65,window.devicePixelRatio||1),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
+ startFrame(target){const gl=this.gl,canvas=this.canvas,ratio=Math.min(window.armyEco?1:1.35,window.devicePixelRatio||1),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
  gl.clearColor(.76,.84,.73,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);this.characterPass=false;gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
  const portrait=w/h<.94,dist=this.cameraZoom*(portrait?1.08:1),yaw=this.cameraYaw,pitch=this.cameraPitch;
  // Initialize on the player immediately; camera must not be left looking at the old world origin.
@@ -79,65 +105,11 @@ export class ArmyRenderer{
  this.vp=mul(perspective(portrait?Math.PI/3.7:Math.PI/4.15,w/h,.1,150),lookAt([ex,ey,ez],[this.cameraTarget.x,.83,this.cameraTarget.z]));
  gl.useProgram(this.pFlat);gl.uniformMatrix4fv(this.flatVP,false,this.vp);gl.bindVertexArray(this.flatVAO);gl.drawArrays(gl.TRIANGLES,0,this.environment.count);
  }
- // Small one-time framebuffer probe checks if the *visible pixels* changed after
- // drawing the protagonist. WebGL errors alone do not catch silent device glitches.
- readAvatarProbe(){
-  const gl=this.gl,w=this.canvas.width,h=this.canvas.height;
-  const pw=Math.min(112,Math.max(1,Math.floor(w*.48)));
-  const ph=Math.min(156,Math.max(1,Math.floor(h*.32)));
-  const x=Math.max(0,Math.floor((w-pw)/2));
-  const y=Math.max(0,Math.floor((h-ph)/2));
-  const bytes=new Uint8Array(pw*ph*4);
-  gl.readPixels(x,y,pw,ph,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
-  return bytes;
- }
- static drawDifference(before,after){
-  let differences=0;
-  for(let i=0;i<before.length;i+=16){
-   if(Math.abs(before[i]-after[i])+Math.abs(before[i+1]-after[i+1])+Math.abs(before[i+2]-after[i+2])>24)differences++;
-  }
-  return differences;
- }
- drawActor(asset,actor){
-  const gl=this.gl,a=this.assets.get(asset);if(!a)return;
-  if(!this.characterPass){gl.clear(gl.DEPTH_BUFFER_BIT);this.characterPass=true;}
-  const isPlayer=asset==='recruit',firstProbe=isPlayer&&this.avatarRenderMode==='probe';
-  const before=firstProbe?this.readAvatarProbe():null;
-  const model=mul(translation(actor.pos.x,groundLift(a,actor),actor.pos.z),rotateY(actor.angle));
-  const draw=(staticMode)=>{
-   if(staticMode){
-    const u=this.avatarStaticUniforms;
-    gl.useProgram(this.pAvatarStatic);gl.uniformMatrix4fv(u.vp,false,this.vp);
-    gl.uniformMatrix4fv(u.model,false,model);gl.uniform1i(u.tex,0);
-   }else{
-    gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);
-    gl.uniformMatrix4fv(this.uniforms.model,false,model);
-    gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);
-    gl.uniform1i(this.uniforms.tex,0);
-   }
-   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);
-   gl.bindVertexArray(a.vao);
-   gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
-  };
-  // The red team uses the same rig, so if the player's skin shader fails,
-  // apply the reliable path consistently to both characters.
-  draw(this.avatarRenderMode==='static'||this.avatarRenderMode==='missing');
-  if(firstProbe){
-   const glError=gl.getError();
-   const after=this.readAvatarProbe();
-   const diff=ArmyRenderer.drawDifference(before,after);
-   if(glError!==gl.NO_ERROR||diff<15){
-    this.avatarRenderIssue='角色動態繪製未通過檢查（像素差 '+diff+'，WebGL '+glError+'）';
-    console.warn(this.avatarRenderIssue,'→ 改用靜態模型備援顯示');
-    this.avatarRenderMode='static';
-    draw(true);
-    const fallback=this.readAvatarProbe();
-    if(ArmyRenderer.drawDifference(before,fallback)<15){
-     this.avatarRenderMode='missing';
-     this.avatarRenderIssue+='；靜態備援也沒有成功顯示。';
-     console.error(this.avatarRenderIssue);
-    }
-   }else{this.avatarRenderMode='skinned';}
-  }
+ drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
+ // The first-person exploration prototype must never lose the character behind roofs
+ // or tall objects. Draw characters with a clean depth buffer after the map pass.
+ if(!this.characterPass){gl.clear(gl.DEPTH_BUFFER_BIT);this.characterPass=true;}
+ gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,groundLift(a,actor),actor.pos.z),rotateY(actor.angle)));
+ gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  }
 }
