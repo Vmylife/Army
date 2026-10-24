@@ -1,5 +1,5 @@
 import {I,mul,perspective,lookAt,translation,rotateY} from './math.js?v=060';
-import {makeEnvironment} from '../map/campGeometry.js?v=061';
+import {makeEnvironment} from '../map/campGeometry.js?v=070';
 const SKIN_VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec2 uv;layout(location=3) in vec4 j;layout(location=4) in vec4 w;
