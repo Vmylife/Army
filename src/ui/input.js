@@ -33,7 +33,7 @@ export function setupInput(canvas,onCamera){
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(movement||camera)return;
     e.preventDefault();
-    canvas.setPointerCapture(e.pointerId);
+    try{canvas.setPointerCapture(e.pointerId)}catch(_){/* older mobile browser */}
     // Any touch starting in the lower 60% invokes movement; the top 40% rotates view.
     if(e.clientY>=window.innerHeight*.4){
       movement={id:e.pointerId,x:e.clientX,y:e.clientY};
