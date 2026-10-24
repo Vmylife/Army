@@ -1,6 +1,7 @@
 // Army v0.7 — ONE cartographic renderer shared by radar and full-camp map.
 // Coordinates and colors come from camp.js. The world stays north-up.
-import {CAMP,PERIMETER,ROADS,ZONES,BUILDINGS,FEATURES} from './camp.js?v=070';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=070';
+import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
  ctx.save();ctx.translate(x,y);ctx.rotate(heading);
@@ -8,10 +9,19 @@ function playerIcon(ctx,x,y,heading,scale=1){
  ctx.beginPath();ctx.moveTo(0,-14*scale);ctx.lineTo(6.8*scale,-3*scale);ctx.lineTo(0,-6*scale);ctx.lineTo(-6.8*scale,-3*scale);ctx.closePath();ctx.fillStyle='#137ef1';ctx.strokeStyle='#fff';ctx.lineWidth=2.5*scale;ctx.fill();ctx.stroke();
  ctx.beginPath();ctx.arc(0,0,6.8*scale,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
 }
+let miniCenter=null; // Keep the local minimap north-up AND mostly stationary; the player icon moves.
 export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=false}){
  if(!ctx||!player||![player.x,player.z,heading].every(Number.isFinite))return;
  const scale=mini?width/36.8:Math.min((width-18)/(CAMP.width+3),(height-20)/(CAMP.depth+5));
- const center=mini?player:{x:0,z:0};
+ if(mini){
+  if(!miniCenter)miniCenter={x:player.x,z:player.z};
+  const safe=9.2; // player moves visibly left/right on map, then the viewport pans at its edge.
+  if(player.x-miniCenter.x>safe)miniCenter.x=player.x-safe;
+  else if(player.x-miniCenter.x< -safe)miniCenter.x=player.x+safe;
+  if(player.z-miniCenter.z>safe)miniCenter.z=player.z-safe;
+  else if(player.z-miniCenter.z< -safe)miniCenter.z=player.z+safe;
+ }
+ const center=mini?miniCenter:{x:0,z:0};
  const px=x=>width/2+(x-center.x)*scale,py=z=>height/2-(z-center.z)*scale;
  const poly=(pts,fill,stroke,sw=1)=>{ctx.beginPath();pts.forEach(([x,z],i)=>i?ctx.lineTo(px(x),py(z)):ctx.moveTo(px(x),py(z)));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}};
  const rect=(x,z,w,d,color,border)=>{
@@ -27,19 +37,20 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  poly(PERIMETER,'#aec79d','#435c4c',Math.max(1.1,scale*.24));
  // Foothills on the northern boundary are part of the plan.
  ctx.beginPath();ctx.moveTo(px(-13),py(25));ctx.bezierCurveTo(px(-4),py(28),px(3),py(25),px(10),py(27));ctx.lineTo(px(21),py(24));ctx.strokeStyle='#799477';ctx.lineWidth=mini?1.5:2;ctx.stroke();
- // Paint the exact in-game roads with rounded joints, one per path.
- for(const r of ROADS){
-  ctx.beginPath();r.points.forEach(([x,z],i)=>i?ctx.lineTo(px(x),py(z)):ctx.moveTo(px(x),py(z)));
-  ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=(r.width+.55)*scale;ctx.strokeStyle='#a79f86';ctx.stroke();
-  ctx.lineWidth=r.width*scale;ctx.strokeStyle='#f0ead6';ctx.stroke();
-  if(!mini&&scale>4){ctx.setLineDash([6,9]);ctx.lineWidth=.08*scale;ctx.strokeStyle='#a7a89b';ctx.stroke();ctx.setLineDash([])}
- }
  // Drill field, shooting range and combat training are outdoor colored zones.
  for(const z of ZONES){ctx.fillStyle=z.color;ctx.strokeStyle='#7b846c';ctx.lineWidth=Math.max(.8,scale*.13);
   if(z.kind==='ellipse'){ctx.beginPath();ctx.ellipse(px(z.x),py(z.z),z.w/2*scale,z.d/2*scale,0,0,Math.PI*2);ctx.fill();ctx.stroke()}
   else if(z.kind==='rect')rect(z.x,z.z,z.w,z.d,z.color,'#9c9379');
   else if(z.kind==='poly')poly(z.points,z.color,null)
  }
+ // Pre-merged continuous roads: no overlapping circles or disconnected-looking seams.
+ const paintRoadShapes=(polygons,color)=>{
+  ctx.beginPath();
+  for(const polygon of polygons)for(const ring of polygon)ring.forEach(([x,z],i)=>i?ctx.lineTo(px(x),py(z)):ctx.moveTo(px(x),py(z)));
+  ctx.fillStyle=color;ctx.fill('evenodd');
+ };
+ paintRoadShapes(ROAD_EDGE_SHAPES,'#aaa28f');
+ paintRoadShapes(ROAD_FILL_SHAPES,'#eee6d2');
  // Rifle targets and obstacle tracks have meaningful landmarks in the map too.
  for(let k=0;k<6;k++)rect(2.1+k*3.4,22.0,.9,.45,'#4e5f53');
  for(let k=0;k<5;k++){

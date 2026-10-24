@@ -1,6 +1,7 @@
 // Army v0.7 — colorful, low-poly army camp matching the 22.0 blueprint.
 // All gameplay geometry is derived from camp.js, so the two maps stay in sync.
-import {CAMP,PERIMETER,ROADS,ZONES,BUILDINGS} from './camp.js?v=070';
+import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=070';
+import {ROAD_EDGE_TRIANGLES,ROAD_FILL_TRIANGLES} from './roadMesh.js?v=071';
 const C={
  grass:[.674,.764,.615],lightGrass:[.716,.801,.661],road:[.863,.833,.740],roadEdge:[.736,.724,.650],
  path:[.915,.878,.779],wall:[.864,.855,.746],wood:[.557,.433,.333],gold:[.872,.713,.422],
@@ -31,9 +32,16 @@ export function makeEnvironment(){
   quad([l,y,s],[l,t,s],[l,t,n],[l,y,n],col);quad([r,y,n],[r,t,n],[r,t,s],[r,y,s],col);
  }
  function disk(x,z,rx,rz,y,col,n=24){for(let i=0;i<n;i++){const a=i*Math.PI*2/n,b=(i+1)*Math.PI*2/n;
-  tri([x,y,z],[x+Math.cos(a)*rx,y,z+Math.sin(a)*rz],[x+Math.cos(b)*rx,y,z+Math.sin(b)*rz],col)}}
+  tri([x,y,z],[x+Math.cos(b)*rx,y,z+Math.sin(b)*rz],[x+Math.cos(a)*rx,y,z+Math.sin(a)*rz],col)}}
  function polyXZ(points,y,col){let cx=0,cz=0;for(const p of points){cx+=p[0];cz+=p[1]}cx/=points.length;cz/=points.length;
-  for(let i=0;i<points.length;i++)tri([cx,y,cz],[points[i][0],y,points[i][1]],[points[(i+1)%points.length][0],y,points[(i+1)%points.length][1]],col)}
+  for(let i=0;i<points.length;i++)tri([cx,y,cz],[points[(i+1)%points.length][0],y,points[(i+1)%points.length][1]],[points[i][0],y,points[i][1]],col)}
+ function roadSurface(points,y,color){
+  for(let i=0;i<points.length;i+=6){
+   const a=[points[i],y,points[i+1]],b=[points[i+2],y,points[i+3]],c=[points[i+4],y,points[i+5]];
+   const normalY=(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]);
+   if(normalY<0)tri(a,c,b,color);else tri(a,b,c,color);
+  }
+ }
  function segment(ax,az,bx,bz,width,y,col){const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1,px=-dz/len*width/2,pz=dx/len*width/2;
   quad([ax+px,y,az+pz],[bx+px,y,bz+pz],[bx-px,y,bz-pz],[ax-px,y,az-pz],col)}
  function strip(points,width,y,col){for(let i=0;i<points.length-1;i++){const [a,b]=[points[i],points[i+1]];segment(a[0],a[1],b[0],b[1],width,y,col)}for(const p of points)disk(p[0],p[1],width/2,width/2,y+.001,col,12)}
@@ -73,16 +81,20 @@ export function makeEnvironment(){
   const cnt=Math.ceil(dist/3.5);for(let t=0;t<cnt;t++){let xx=a[0]+dx*(t+.5)/cnt,zz=a[1]+dz*(t+.5)/cnt;
    segment(xx-dx/cnt*.45,zz-dz/cnt*.45,xx+dx/cnt*.45,zz+dz/cnt*.45,.045,1.10,C.dark)}
  }
- // Roads: primitive strips and circles handle gradual turns without sharp seams.
- for(const road of ROADS){strip(road.points,road.width+.18,.011,C.roadEdge);strip(road.points,road.width,.022,C.road)}
+ // Ground zones get unique heights to prevent coincident polygons from flickering.
+ // Especially the grenade throwing area overlaps the main drill field in plan view.
  for(const zone of ZONES){const color=hex(zone.color);
-  if(zone.kind==='ellipse')disk(zone.x,zone.z,zone.w/2,zone.d/2,.030,color,70);
-  else if(zone.kind==='rect')box(zone.x,.028,zone.z,zone.w,.041,zone.d,color);
-  else if(zone.kind==='poly')polyXZ(zone.points,.035,color);
+  if(zone.kind==='ellipse')disk(zone.x,zone.z,zone.w/2,zone.d/2,zone.id==='grenade'?.051:.034,color,70);
+  else if(zone.kind==='rect')box(zone.x,.023,zone.z,zone.w,.038,zone.d,color);
+  else if(zone.kind==='poly')polyXZ(zone.points,.037,color);
  }
+ // Single seamless road mesh, not overlapping rounded caps at equal depths.
+ // Roads cover zones where they meet, so all crossings visibly connect.
+ roadSurface(ROAD_EDGE_TRIANGLES,.089,C.roadEdge);
+ roadSurface(ROAD_FILL_TRIANGLES,.094,C.road);
  // Major training grounds and decorations.
  // Drill field oval marked with one neat border, without old crosshatched tiles.
- for(let i=0;i<64;i++){let a=i*2*Math.PI/64,b=(i+1)*2*Math.PI/64;segment(-20.8+Math.cos(a)*8.7,-2+Math.sin(a)*12.4,-20.8+Math.cos(b)*8.7,-2+Math.sin(b)*12.4,.18,.061,C.redDark)}
+ for(let i=0;i<64;i++){let a=i*2*Math.PI/64,b=(i+1)*2*Math.PI/64;segment(-20.8+Math.cos(a)*8.7,-2+Math.sin(a)*12.4,-20.8+Math.cos(b)*8.7,-2+Math.sin(b)*12.4,.18,.076,C.redDark)}
  box(-22,.05,7.0,2.0,.36,1.3,C.tan);box(-22,.42,7,.60,.23,.55,C.redDark);  // command platform
  for(let i=0;i<5;i++)box(-28.2,.05,-3.3+i*1.8,.36,.22,.72,C.wood); // instructors' stands
  sandbags(-20,-11.2);box(-19,.05,-10.0,1.4,.11,.15,C.wood);
@@ -97,8 +109,8 @@ export function makeEnvironment(){
  for(let i=0;i<4;i++)box(2.2+i*5.6,.03,6.7,2.3,.26,.65,C.tan);
  for(const [x,z] of [[-4,18],[21,8],[29,8],[28,-18],[-10,-18],[-38,10]])signage(x,z,C.olive);
  // Company assembly plaza, one parade canopy and markers.
- box(15,.050,-8.2,16.2,.11,4.8,C.sand);box(15,.17,-8.2,14.4,.035,3.9,C.tan);
- for(let i=0;i<3;i++)box(7.8,.18,-9.7+i*1.2,.11,.65,.11,C.iron);
+ box(15,.026,-8.2,16.2,.027,4.8,C.sand);
+ for(let i=0;i<3;i++)box(7.8,.05,-9.7+i*1.2,.11,.65,.11,C.iron);
  // Fitness park. Parallel bars and pull-up bars.
  for(let i=0;i<4;i++){const x=15.9+i*2.9;box(x-.82,.04,-17,.10,1.68,.10,C.iron);box(x+.82,.04,-17,.10,1.68,.10,C.iron);box(x,1.69,-17,1.75,.10,.10,C.iron)}
  // Static training items around the site.
@@ -116,98 +128,36 @@ export function makeEnvironment(){
  box(-.7,.05,-22.0,.14,4.1,.14,C.stone);
  box(-.18,3.72,-22.0,1.1,.65,.08,C.red);
 
- // Buildings: varied silhouettes, facades and props, not recolored boxes.
- for(const b of BUILDINGS){const p=P[b.kind]||P.barracks;
-  const baseY=.06;
-  box(b.x,baseY,b.z,b.w,b.h,b.d,p.wall);
-  box(b.x,b.h-.05,b.z,b.w+.28,.18,b.d+.25,p.trim);
-  if(['ammo','armory','chem'].includes(b.kind)){
-   box(b.x,b.h+.08,b.z,b.w+.36,.26,b.d+.36,p.roof);
+ // Simple v0.6-style houses: clean solid walls, one roof, entrance and windows.
+ // Detailed Meshy architecture can be added later without changing the camp layout.
+ for(const b of BUILDINGS){
+  const p=P[b.kind]||P.barracks;
+  box(b.x,.035,b.z,b.w,b.h,b.d,p.wall);
+  box(b.x,b.h-.07,b.z,b.w+.22,.15,b.d+.22,p.trim);
+  // The same modest low-poly gable roof across all buildings.
+  ridged(b.x,b.z,b.w+.48,b.d+.46,b.h+.08,.39,p.roof);
+  const entry=b.entry||{x:b.x,z:b.z-b.d/2-1};
+  const frontX=Math.abs(entry.x-b.x)>Math.abs(entry.z-b.z);
+  if(frontX){
+   const sign=entry.x>=b.x?1:-1,fx=b.x+sign*(b.w/2+.065);
+   box(fx,.035,b.z,.13,1.52,.94,C.wood);
+   for(let k=-2;k<=2;k++){
+    if(k===0)continue;
+    const z=b.z+(k/3)*b.d*.78;
+    box(fx,.85,z,.15,.62,.61,C.blue);
+   }
   }else{
-   ridged(b.x,b.z,b.w+.65,b.d+.58,b.h+.05,.63,p.roof);
-  }
-  // Front facade switches to east/west for the long barrack and the canteen.
-  const side=b.kind==='barracks'||b.kind==='canteen'||b.kind==='wash'||b.kind==='medic'||b.kind==='chem';
-  const dir=side?(b.entry.x>=b.x?1:-1):1;
-  if(side){
-   const fx=b.x+dir*(b.w/2+.06);
-   box(fx,.08,b.z,.16,b.h*.55,1.12,p.trim);
-   for(let i=-2;i<=2;i++){if(i===0)continue;box(fx,.90,b.z+i*b.d/6.1,.13,.83,.72,C.blue)}
-  }else{
-   const fz=b.z-b.d/2-.065;
-   door(b.x,.08,fz);
-   const n=Math.max(2,Math.floor(b.w/2.3));
-   for(let i=0;i<n;i++){const x=b.x+(i-(n-1)/2)*b.w/(n+.5);if(Math.abs(x-b.x)<.85)continue;window(x,.93,fz,.73,.76,.10)}
-  }
-  switch(b.kind){
-  case 'barracks':
-   // Covered corridor, balcony railing, shoe racks, drying clothes.
-   for(const xx of [b.x+b.w/2+.65,b.x+b.w/2+1.2])box(xx,.04,b.z,.11,1.6,b.d+.5,C.wood);
-   box(b.x+b.w/2+.94,1.60,b.z,1.35,.16,b.d+.9,p.roof);
-   box(b.x+b.w/2+.85,.46,b.z,.12,.11,b.d+.2,C.olive);
-   for(let k=-3;k<=3;k++){const z=b.z+k*2.25;
-    box(b.x+b.w/2+.90,1.55,z,.14,.15,.11,C.white);
-    box(b.x+b.w/2+1.48,.06,z,.75,.54,.78,C.wood);}
-   for(let k=0;k<4;k++){box(b.x+b.w/2+2.2,.08,b.z-5.6+k*1.7,.78,.10,.56,C.wood);box(b.x+b.w/2+2.2,.34,b.z-5.6+k*1.7,.65,.13,.15,C.blue)}
-   break;
-  case 'office':
-   // Two stories, windows, high stair and notice board.
-   for(let i=-4;i<=4;i++){const x=b.x+i*1.25;window(x,2.2,b.z-b.d/2-.11,.72,.65,.08)}
-   box(b.x,.04,b.z-b.d/2-1.14,3.15,.32,1.70,C.stone);
-   box(b.x+3.7,.09,b.z-b.d/2-1.15,1.60,1.30,.14,C.wood);
-   banner(b.x,b.z-b.d/2-.24,b.w*.55,b.h-.05,C.blue);
-   break;
-  case 'ammo':
-   // Fortress store with thick doors, reinforced pillars and warning stripes.
-   box(b.x,.07,b.z-b.d/2-.19,1.90,1.98,.20,C.dark);
-   for(let i=-2;i<=2;i++)box(b.x+i*.29,1.84,b.z-b.d/2-.32,.13,.14,.06,i%2?C.gold:C.redDark);
-   for(const x of [b.x-b.w/2+.35,b.x+b.w/2-.35])box(x,.07,b.z-b.d/2-.16,.40,2.13,.32,p.trim);
-   break;
-  case 'chem':
-   // Industrial vent / exhaust fans and hazard tiles.
-   for(let i=0;i<3;i++)box(b.x-2+i*2,.06,b.z+b.d/2+.10,1.20,1.17,.35,C.iron);
-   for(let i=0;i<2;i++)box(b.x-1+i*2.1,b.h+.26,b.z-.4,.8,.44,.8,C.iron);
-   banner(b.x+1.0,b.z-b.d/2-.15,3.2,b.h-.15,C.dark);
-   break;
-  case 'shop':
-   // Convenience shop front, awning, two colorful vending machines.
-   box(b.x,1.74,b.z-b.d/2-.58,b.w+.55,.20,1.13,p.roof);
-   for(let i=0;i<7;i++)box(b.x-b.w/2+.45+i*.8,1.68,b.z-b.d/2-.64,.42,.13,1.07,i%2?C.cream:C.gold);
-   vending(b.x+b.w/2+1.12,b.z-.65,true);vending(b.x+b.w/2+1.12,b.z+.28,false);
-   banner(b.x,b.z-b.d/2-.74,b.w*.72,2.1,C.olive);
-   break;
-  case 'canteen':
-   // A tall cafeteria, service window and tables outside the front entrance.
-   banner(b.x-b.w/2-.15,b.z,3.0,2.15,C.redDark);
-   for(let i=-2;i<=2;i++){box(b.x-b.w/2-1.5,.35,b.z+i*1.65,.85,.12,1.1,C.wood);box(b.x-b.w/2-1.5,.04,b.z+i*1.65,.11,.36,.14,C.dark)}
-   break;
-  case 'wash':
-   // Multiple stainless sinks with basins and faucets (no single-color hut).
-   for(let i=-1;i<=1;i++){const z=b.z+i*1.6;box(b.x-.6,.48,z,1.08,.17,1.10,C.white);
-    box(b.x-.6,.35,z,.86,.11,.86,C.blue);box(b.x-.92,.59,z,.10,.42,.10,C.iron)}
-   break;
-  case 'medic':
-   // Red cross on outer wall + emergency aid cart.
-   cross(b.x-b.w/2-.18,b.z,1.42,'x');
-   box(b.x-b.w/2-1.0,.48,b.z+1.2,1.1,.12,.68,C.white);box(b.x-b.w/2-1,.05,b.z+1.2,.10,.50,.10,C.iron);
-   break;
-  case 'armory':
-   box(b.x,.06,b.z-b.d/2-.13,2.20,1.75,.20,C.dark);
-   for(let k=-2;k<=2;k++)box(b.x+k*.37,.24,b.z-b.d/2-.25,.08,1.48,.07,C.iron);
-   box(b.x+.55,1.0,b.z-b.d/2-.32,.20,.18,.12,C.gold);
-   break;
-  case 'visitor':
-   for(const x of [b.x-1.4,b.x+1.4])window(x,1.0,b.z-b.d/2-.12,.95,.89,.10);
-   for(let i=-1;i<=1;i++)bench(b.x+i*1.5,b.z-b.d/2-1.5);
-   break;
-  case 'guard':
-   box(b.x,.88,b.z-b.d/2-.14,1.5,.94,.18,C.blue);
-   box(b.x,b.h+.7,b.z,.34,.34,.35,C.red);
-   break;
+   const sign=entry.z>=b.z?1:-1,fz=b.z+sign*(b.d/2+.065);
+   box(b.x,.035,fz,1.00,1.53,.13,C.wood);
+   for(let k=-2;k<=2;k++){
+    if(k===0)continue;
+    const x=b.x+(k/3)*b.w*.77;
+    box(x,.87,fz,.64,.62,.15,C.blue);
+   }
   }
  }
  // Flagship military atmosphere without expensive 3D mesh imports.
- for(let k=0;k<3;k++)sandbags(25+k*.70,-.40);
+
  return {verts:new Float32Array(verts),cols:new Float32Array(cols),norms:new Float32Array(norms),count:verts.length/3,triangles};
 }
 function hex(c){return [parseInt(c.slice(1,3),16)/255,parseInt(c.slice(3,5),16)/255,parseInt(c.slice(5,7),16)/255]}

@@ -1,9 +1,9 @@
 import {loadGlb} from './core/glb.js?v=060';
-import {ArmyRenderer} from './core/renderer.js?v=070';
+import {ArmyRenderer} from './core/renderer.js?v=071';
 import {RigAnimator} from './characters/rigAnimator.js?v=060';
 import {CAMP,moveWithCollision} from './map/camp.js?v=070';
-import {drawMinimap} from './ui/minimap.js?v=070';
-import {initWorldMap} from './ui/worldMap.js?v=070';
+import {drawMinimap} from './ui/minimap.js?v=071';
+import {initWorldMap} from './ui/worldMap.js?v=071';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 

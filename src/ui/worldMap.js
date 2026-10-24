@@ -1,6 +1,6 @@
 // Army v0.7 - full map and list share the real camp coordinates with the 3D map.
 import {CAMP,FEATURES} from '../map/camp.js?v=070';
-import {drawCampMap} from '../map/mapDrawing.js?v=070';
+import {drawCampMap} from '../map/mapDrawing.js?v=071';
 function render(canvas,player,enemy,heading){
  const ctx=canvas.getContext('2d');if(!ctx)return;
  const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight),dpr=Math.min(2,devicePixelRatio||1);
