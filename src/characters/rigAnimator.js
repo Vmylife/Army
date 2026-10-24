@@ -1,0 +1,31 @@
+import {I,mul,trs} from '../core/math.js';
+const LOOP=new Set(['Walking','Running','Casual_Walk','RunFast','Run_03','Boxing_Practice']);
+const ease=(a,b,t)=>a+(b-a)*t;
+function lerpQuat(a,b,t){let dot=a.reduce((sum,v,i)=>sum+v*b[i],0);const bv=dot<0?b.map(x=>-x):b;let q=a.map((v,i)=>ease(v,bv[i],t));const len=Math.hypot(...q)||1;return q.map(x=>x/len)}
+function readTrack(t,x,quat=false){const {times,values,width,interpolation}=t;const n=times.length;
+ if(!n)return quat?[0,0,0,1]:[0,0,0];if(x<=times[0])return Array.from(values.subarray(0,width));if(x>=times[n-1])return Array.from(values.subarray((n-1)*width,n*width));
+ let lo=0,hi=n-1;while(hi-lo>1){const mid=(hi+lo)>>1;if(times[mid]<=x)lo=mid;else hi=mid;}
+ const a=Array.from(values.subarray(lo*width,(lo+1)*width));const b=Array.from(values.subarray(hi*width,(hi+1)*width));if(interpolation==='STEP')return a;
+ const f=(x-times[lo])/(times[hi]-times[lo]);return quat?lerpQuat(a,b,f):a.map((v,i)=>ease(v,b[i],f));
+}
+export class RigAnimator{
+ constructor(gltf){this.gltf=gltf;this.j=gltf.json;this.nodes=this.j.nodes;this.inverse=this.j.skins[0].inverseBindMatrices!==undefined?gltf.read(this.j.skins[0].inverseBindMatrices):null;this.joints=this.j.skins[0].joints;this.parents=new Map();this.nodes.forEach((n,i)=>{for(const c of n.children||[])this.parents.set(c,i)});this.meshIndex=this.nodes.findIndex(n=>n.mesh!==undefined);
+ this.clips={};for(const anim of this.j.animations||[]){let max=0;const tracks=new Map();for(const c of anim.channels){const s=anim.samplers[c.sampler],times=gltf.read(s.input),values=gltf.read(s.output),path=c.target.path;max=Math.max(max,times[times.length-1]||0);tracks.set(`${c.target.node}/${path}`,{times,values,width:path==='rotation'?4:3,interpolation:s.interpolation||'LINEAR'})}this.clips[anim.name]={duration:max,tracks}}
+ this.clip='Arise';this.clock=999;this.speed=1;this.bones=new Float32Array(this.joints.length*16);this.globals=new Map();this.prevClip=null;this.transition=0;this.prevTime=0;this.completed=false;
+ }
+ setClip(name,{restart=false}={}){if(!this.clips[name])return false;if(this.clip===name&&!restart)return true;
+ this.prevClip=this.clip;this.prevTime=this.clock;this.transition=.18;this.clip=name;this.clock=0;this.completed=false;return true}
+ hasClip(name){return Boolean(this.clips[name])}
+ finished(){return this.completed}
+ evaluate(dt){this.clock+=Math.max(0,Math.min(.07,dt))*this.speed;this.transition=Math.max(0,this.transition-dt);
+ const clip=this.clips[this.clip],loop=LOOP.has(this.clip),t=loop?(this.clock%clip.duration):Math.min(this.clock,clip.duration);this.completed=!loop&&this.clock>=clip.duration;
+ this.globals.clear();const cache=new Map();const prevData=this.prevClip?this.clips[this.prevClip]:null;const f=this.transition>0&&prevData?1-this.transition/.18:1;
+ const makeLocal=(i)=>{const n=this.nodes[i],trans=n.translation||[0,0,0],rot=n.rotation||[0,0,0,1],s=n.scale||[1,1,1];let p=clip.tracks.has(`${i}/translation`)?readTrack(clip.tracks.get(`${i}/translation`),t):trans;
+ let q=clip.tracks.has(`${i}/rotation`)?readTrack(clip.tracks.get(`${i}/rotation`),t,true):rot;
+ if(f<1){let oldT=LOOP.has(this.prevClip)?this.prevTime%prevData.duration:Math.min(this.prevTime,prevData.duration);let pp=prevData.tracks.has(`${i}/translation`)?readTrack(prevData.tracks.get(`${i}/translation`),oldT):trans;let pq=prevData.tracks.has(`${i}/rotation`)?readTrack(prevData.tracks.get(`${i}/rotation`),oldT,true):rot;p=p.map((v,k)=>ease(pp[k],v,f));q=lerpQuat(pq,q,f)}
+ const mat=trs(p,q);if(n.scale){for(let c=0;c<3;c++)for(let r=0;r<3;r++)mat[c*4+r]*=s[c]}return mat};
+ const world=i=>{if(cache.has(i))return cache.get(i);const local=makeLocal(i),parent=this.parents.get(i),result=parent===undefined?local:mul(world(parent),local);cache.set(i,result);return result};
+ for(let k=0;k<this.joints.length;k++){const i=this.joints[k],global=world(i),inv=this.inverse?this.inverse.subarray(k*16,k*16+16):I;this.bones.set(mul(global,inv),k*16)}
+ return this.bones;
+ }
+}
