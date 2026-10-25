@@ -1,7 +1,7 @@
 // Army 0.7.9 — three shared Meshy buildings, nine camp locations.
 // Textured static GLBs are uploaded once per type, while each campus instance
 // has its own scale, rotation and a subtle identifying wall-color tint.
-import {BUILDINGS} from '../map/camp.js?v=089';
+import {BUILDINGS} from '../map/camp.js?v=090';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 const PLAN={
@@ -93,8 +93,10 @@ export class CampBuildings{
   const sy=b.h/d.size[1];
   let sz=(turned?footprintWidth:footprintDepth)/d.size[2];
   if(cfg.uniformXZ){
-   const fitX=(turned?footprintDepth:footprintWidth)/d.size[0];
-   const fitZ=(turned?footprintWidth:footprintDepth)/d.size[2];
+   // Stable uniform scale: rotating the open-air wash station must NOT
+   // stretch the roof/sink or change its overall size.
+   const fitX=footprintWidth/d.size[0];
+   const fitZ=footprintDepth/d.size[2];
    const uniform=Math.min(fitX,fitZ)*cfg.uniformXZ;
    sx=uniform;sz=uniform;
   }

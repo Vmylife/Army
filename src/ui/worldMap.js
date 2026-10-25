@@ -1,6 +1,6 @@
 // Army v0.7 - full map and list share the real camp coordinates with the 3D map.
-import {CAMP} from '../map/camp.js?v=089';
-import {drawCampMap} from '../map/mapDrawing.js?v=089';
+import {CAMP} from '../map/camp.js?v=090';
+import {drawCampMap} from '../map/mapDrawing.js?v=090';
 // Matches the screenshot: dormitory on right, canteen on left, gate at bottom.
 // Geographical orientation stays fixed even when the 3D camera or soldier rotates.
 export const FULL_MAP_YAW = Math.PI;

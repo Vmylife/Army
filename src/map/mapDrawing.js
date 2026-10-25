@@ -1,6 +1,6 @@
 // Army v0.7.6 — shared world geometry, independently chosen map orientation.
 // Minimap is camera-aligned; full map uses a constant heading based on screenshot.
-import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=089';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=090';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
