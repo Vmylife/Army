@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="theme-color" content="#233d32">
+<title>國軍模擬器｜戰場人生實驗室 v0.12.0</title>
+<link rel="stylesheet" href="./src/war-story/story.css?v=0120">
+<script type="module" src="./src/war-story/story-ui.js?v=0120"></script>
+</head>
+<body>
+<div class="page-shell">
+ <header class="topbar">
+  <a class="back" href="./index.html" aria-label="返回軍營首頁">← <span>軍營首頁</span></a>
+  <span class="version">EXPERIMENT 0120</span>
+ </header>
+ <main>
+  <section class="hero" aria-labelledby="pageTitle">
+   <div class="eyebrow"><span class="signal"></span> WAR CHRONICLE / 戰場人生</div>
+   <h1 id="pageTitle">這個阿兵哥，<br><em>究竟能活幾個月？</em></h1>
+   <p>你負責把他練成什麼樣子。剩下的，交給命運。</p>
+   <div class="hero-decor" aria-hidden="true"><div class="stamp">機密<br><small>第 001 號</small></div></div>
+  </section>
+  <section class="config-card" aria-labelledby="configTitle">
+   <div class="section-header"><span class="index">01</span><h2 id="configTitle">建立士兵檔案</h2><span class="tag-subtle">測試版</span></div>
+   <div class="name-row"><label for="soldierName">士兵暱稱</label><input id="soldierName" maxlength="16" autocomplete="off" value="阿偉" placeholder="輸入名字"/></div>
+   <div class="score-top"><div><label for="scoreRange">訓練綜合評分</label><small>能力越高通常越有利，但不保證命運</small></div><div class="score-bubble"><strong id="scoreValue">50</strong><span>/ 100</span></div></div>
+   <input id="scoreRange" type="range" min="1" max="100" value="50" step="1" aria-label="士兵訓練評分 1 到 100"/>
+   <div class="range-labels"><span>1 · 廢兵</span><strong id="scoreRating">普通新兵</strong><span>100 · 戰神</span></div>
+   <div class="traits-header"><div><h3><span class="mini-symbol plus">＋</span> 正面特質</h3><p>可複選，增加不同事件與生存機會</p></div><span class="trait-count" id="positiveCount">已選 0</span></div>
+   <div id="positiveTraits" class="trait-grid" aria-label="正面特質選擇"></div>
+   <div class="traits-header negative-head"><div><h3><span class="mini-symbol minus">−</span> 負面特質</h3><p>不一定是壞事，有些糗事會變成傳奇</p></div><span class="trait-count" id="negativeCount">已選 0</span></div>
+   <div id="negativeTraits" class="trait-grid" aria-label="負面特質選擇"></div>
+   <div class="control-foot"><span id="selectedSummary">尚未選取特質</span><button id="clearTraits" class="link-btn" type="button">清空特質</button></div>
+   <button id="generateBtn" class="primary-btn" type="button">生成戰場人生 <span>↗</span></button>
+   <p class="tiny-note">在裝置端依事件庫、能力與隨機種子產生。無須 AI API、無額外費用。每局最多 36 個月，可能提前陣亡或返鄉。</p>
+  </section>
+  <section id="resultSection" class="result-section" hidden aria-live="off">
+   <div class="section-header"><span class="index">02</span><h2>戰地服役紀錄</h2><span id="resultStatus" class="tag-subtle">報告生成中</span></div>
+   <div class="dossier">
+    <div><div class="dossier-label">士兵</div><div class="dossier-name" id="resultName">阿偉</div></div>
+    <div><div class="dossier-label">能力評分</div><div class="dossier-value" id="resultScore">50</div></div>
+    <div><div class="dossier-label">戰功</div><div class="dossier-value" id="resultMerit">0</div></div>
+    <div><div class="dossier-label">經歷月份</div><div class="dossier-value" id="resultMonths">—</div></div>
+   </div>
+   <div class="playback-bar">
+    <div class="playback-text"><span class="live-dot"></span><span id="progressText">第 1 個月</span></div>
+    <div class="playback-actions">
+      <button type="button" id="pauseBtn" class="small-btn" aria-label="暫停或繼續播放">暫停</button>
+      <button type="button" id="speedBtn" class="small-btn" aria-label="切換播放速度">1×</button>
+      <button type="button" id="revealBtn" class="small-btn primary-small">全部展開</button>
+    </div>
+   </div>
+   <div class="timeline-progress"><div id="timelineFill"></div></div>
+   <div id="timeline" class="timeline" aria-label="逐月戰場人生"></div>
+   <div id="endingCard" class="ending-card" hidden>
+    <div class="ending-eyebrow">FINAL REPORT / 最終結案</div>
+    <div id="endingIcon" class="ending-icon">🏅</div>
+    <h2 id="endingTitle">—</h2><p id="endingText">—</p>
+    <div class="ending-stats" id="endingStats"></div>
+    <h3>本次解鎖成就 <span id="achievementCount"></span></h3>
+    <div id="achievementList" class="achievements"></div>
+    <div class="ending-actions">
+      <button id="regenerateBtn" class="primary-btn" type="button">同樣條件，再來一次 ↻</button>
+      <button id="copyBtn" type="button" class="secondary-btn">複製完整戰報</button>
+      <button id="saveBtn" type="button" class="secondary-btn">下載文字紀錄</button>
+    </div>
+    <p class="tiny-note">每局使用不同隨機種子。低分士兵也可能生還，高分士兵也可能在戰區遭遇不測。</p>
+   </div>
+  </section>
+ </main>
+ <footer>國軍模擬器 · 戰場人生系統原型 v0.12.0 <span>完全虛構的劇情與人物</span></footer>
+</div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
