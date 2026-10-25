@@ -1,11 +1,11 @@
 import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=082';
-import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=082';
+import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=085';
 import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=082';
 import {RigAnimator} from './characters/rigAnimator.js?v=084';
 import {RifleRenderer} from './battle/rifleRenderer.js?v=084';
 import {updateRangeShooter,createRangeAudio} from './battle/rangeTraining.js?v=084';
-import {CAMP,moveWithCollision} from './map/camp.js?v=082';
+import {CAMP,moveWithCollision} from './map/camp.js?v=085';
 import {drawMinimap} from './ui/minimap.js?v=076';
 import {initWorldMap} from './ui/worldMap.js?v=076';
 import {setupInput} from './ui/input.js?v=062';
@@ -46,46 +46,66 @@ function createCampNPCs(glb){
   anim.setClip('Idle');anim.evaluate(0);
   const px=s.job==='shoot'?s.x:s.x+(i%2?-.35:.35),pz=s.job==='shoot'?s.z:s.z+((i%3)-1)*.35;
   return {pos:{x:px,z:pz},angle:(i%5)*1.2,anim,home:s,
-    tx:px,tz:pz,state:'pause',until:0,nextEval:0,
+    tx:px,tz:pz,state:'pause',until:0,nextThink:0,
     seed:i*19+7,phase:i*1.23};
  });
 }
+// NPC decisions are inexpensive and happen at a low rate. Position, facing and
+// visible skeletal animations MUST advance every rendered frame. The v0.8.4
+// 65 / 145 / 700 ms throttling caused the 12 / 7 / 1 FPS NPC "teleport" effect.
 function updateCampNPCs(npcs,dt,now,playerPos){
  for(let i=0;i<npcs.length;i++){
-  const n=npcs[i],d=Math.hypot(n.pos.x-playerPos.x,n.pos.z-playerPos.z);
-  // Less frequent updates for distant soldiers: keep mobile WebGL2 responsive.
-  const interval=d>30?700:d>18?145:65;
-  if(now<n.nextEval)continue;
-  const elapsed=Math.min(.20,(now-(n.lastUpdate??now))/1000);
-  n.lastUpdate=now;n.nextEval=now+interval+(i%4)*7;
-  const activity=n.home.job;
-  if(activity==='shoot'){updateRangeShooter(n,now);n.anim.evaluate(elapsed);continue;}
-  if(n.state==='pause'&&now>=n.until){
-   const q=n.phase+now*.00019;
-   const radius=n.home.r*(.30+.4*((Math.sin(q*1.6)+1)*.5));
-   n.tx=n.home.x+Math.cos(q*2.3)*radius;
-   n.tz=n.home.z+Math.sin(q*2.3)*radius;
-   n.state='move';
+  const n=npcs[i],activity=n.home.job;
+  const d=Math.hypot(n.pos.x-playerPos.x,n.pos.z-playerPos.z);
+  if(activity==='shoot'){
+   // Keep aim blend and shot timing smooth. Never throttle the firing cycle.
+   updateRangeShooter(n,now);
+  }else{
+   // Only choosing the NEXT destination is throttled; never movement.
+   if(n.state==='pause'&&now>=n.until&&now>=n.nextThink){
+    const q=n.phase+now*.00019;
+    const radius=n.home.r*(.30+.4*((Math.sin(q*1.6)+1)*.5));
+    n.tx=n.home.x+Math.cos(q*2.3)*radius;
+    n.tz=n.home.z+Math.sin(q*2.3)*radius;
+    n.state='move';
+    n.nextThink=now+350+(i%4)*85;
+   }
+   if(n.state==='move'){
+    const dx=n.tx-n.pos.x,dz=n.tz-n.pos.z,dist=Math.hypot(dx,dz);
+    if(dist<.18){
+     n.state='pause';
+     n.until=now+(activity==='chat'?3600:activity==='train'?2600:1000)+((i*569)%1900);
+    }else{
+     const speed=activity==='march'?1.35:activity==='patrol'?1.25:.8;
+     const mx=dx/dist,mz=dz/dist;
+     const step=Math.min(dist,speed*dt);
+     const moved=moveWithCollision(n.pos,mx*step,mz*step);
+     if(step>.00001&&Math.hypot(moved.x-n.pos.x,moved.z-n.pos.z)<.00001){
+      n.state='pause';n.until=now+1200;
+     }else{
+      n.pos=moved;
+      // Frame-rate-independent turning (smooth at both 30 and 60 FPS).
+      const desired=Math.atan2(mx,mz);
+      const delta=Math.atan2(Math.sin(desired-n.angle),Math.cos(desired-n.angle));
+      n.angle+=delta*Math.min(1,1-Math.exp(-14*dt));
+     }
+    }
+   }
+   let clip=n.state==='move'?'Walking':'Idle';
+   if(n.state==='pause'&&activity==='train'){
+    const chosen=['push_up','situps','Idle'][i%3];
+    if(n.anim.hasClip(chosen))clip=chosen;
+   }
+   if(n.anim.clip!==clip)n.anim.setClip(clip);
+   n.anim.speed=n.state==='move'?(activity==='march'?1.15:1):1;
   }
-  if(n.state==='move'){
-   const dx=n.tx-n.pos.x,dz=n.tz-n.pos.z,dist=Math.hypot(dx,dz);
-   if(dist<.25){n.state='pause';n.until=now+(activity==='chat'?3600:activity==='train'?2600:1000)+((i*569)%1900);}
-   else {
-    const speed=activity==='march'?1.35:activity==='patrol'?1.25:.8;
-    const mx=dx/dist,mz=dz/dist;
-    const moved=moveWithCollision(n.pos,mx*speed*elapsed,mz*speed*elapsed);
-    if(Math.hypot(moved.x-n.pos.x,moved.z-n.pos.z)<.005){n.state='pause';n.until=now+1200;}
-    else {n.pos=moved;face(n,mx,mz)}
+  // Off-screen/distant characters do not render; save bone CPU time while
+  // keeping their world position and decisions synchronized in real time.
+  if(d<28.5){
+   if(activity==='shoot'||n.state==='move'||n.anim.transition>0||n.anim.clip!=='Idle'){
+    n.anim.evaluate(dt);
    }
   }
-  let clip=n.state==='move'?'Walking':'Idle';
-  if(n.state==='pause'&&activity==='train'){
-   const chosen=['push_up','situps','Idle'][i%3];
-   if(n.anim.hasClip(chosen))clip=chosen;
-  }
-  if(n.anim.clip!==clip)n.anim.setClip(clip);
-  n.anim.speed=n.state==='move'?(activity==='march'?1.15:1):1;
-  n.anim.evaluate(elapsed);
  }
 }
 
@@ -126,6 +146,7 @@ async function boot(){
     ratio=>{if(!worldMap.isOpen()&&Number.isFinite(ratio)&&ratio>0)targetZoom=Math.max(minZoom,Math.min(maxZoom,targetZoom*ratio))}
   );
   let last=performance.now(),lastMap=0,lastDebug=0;
+  let fpsFrames=0,fpsSince=last,measuredFps=0;
   // Both maps use the SAME camera-aligned projection. Keep the map heading
   // stable while stationary; rotating only the camera never rotates the soldier arrow.
   let mapYaw=camYaw;
@@ -147,6 +168,7 @@ async function boot(){
   function tick(now){
    try{
     const dt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;
+    if(debug){fpsFrames++;if(now-fpsSince>=1000){measuredFps=Math.round(fpsFrames*1000/(now-fpsSince));fpsFrames=0;fpsSince=now;}}
     const stick=worldMap.isOpen()?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
     cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
     if(m.speed>0){
@@ -182,7 +204,7 @@ async function boot(){
       worldMap.update(player.pos,null,player.angle);
       lastMap=now;
     }
-    if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`mode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
+    if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`fps: ${measuredFps}\nmode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
     requestAnimationFrame(tick);
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}
   }

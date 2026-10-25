@@ -100,6 +100,7 @@ export function moveWithCollision(pos,dx,dz){
 }
 
 
+// Army v0.8.5: tree 25% larger, supply crate/barrel ~30% smaller.
 // Army v0.8.2: true REPLACEMENT positions. These exactly match the removed
 // geometric stand-ins in campGeometry.js. Do not spawn a second copy nearby.
 export const PROPS = [
@@ -115,13 +116,13 @@ export const PROPS = [
  // Since the source had no separate oil barrels or crates, we reuse existing
  // supply blocks rather than add random piles around houses or roads.
  ...[0,1,2,3].map(i=>({type:i%2===0?'crate':'barrel',x:2.2+i*5.6,z:6.7,
-    scale:i%2===0?1.95:1.65,yaw:0,cull:56})),
+    scale:i%2===0?1.37:1.15,yaw:0,cull:56})),
  // 13 EXISTING tree locations (the old angular primitive trees have been removed).
  ...[[-42,13,1],[-43,-17,1.1],[-37,17,.9],[-28,21,1.1],[-10,23,1.0],
      [5,24,1],[20,25,1],[26,21,.7],[40,10,.9],[41,-11,1],[-41,-19,.8],
      [-31,-19,1.0],[28,-20,.9]].map(([x,z,k],i)=>({type:i%2===0?'treeA':'treeB',x,z,
-       scale:(i%2===0?2.9:3.1)*k,yaw:(i%4)*.43,cull:74})),
+       scale:(i%2===0?2.9:3.1)*k*1.25,yaw:(i%4)*.43,cull:74})),
  // Only trees may be slightly more numerous; five MORE around the existing treeline.
  ...[[-39,18.8],[-18,23.9],[13,23.6],[36,-17.8],[-7,23.5]].map(([x,z],i)=>
-   ({type:i%2===0?'treeB':'treeA',x,z,scale:2.8+(i%3)*.23,yaw:i*.54,cull:74}))
+   ({type:i%2===0?'treeB':'treeA',x,z,scale:(2.8+(i%3)*.23)*1.25,yaw:i*.54,cull:74}))
 ];
