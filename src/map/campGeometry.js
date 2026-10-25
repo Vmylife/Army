@@ -1,6 +1,6 @@
 // Army v0.8.2 — old decorative stand-ins replaced by Meshy assets at the same coordinates.
 // All gameplay geometry is derived from camp.js, so the two maps stay in sync.
-import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=086';
+import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=092';
 import {ROAD_EDGE_TRIANGLES,ROAD_FILL_TRIANGLES} from './roadMesh.js?v=071';
 const C={
  grass:[.674,.764,.615],lightGrass:[.716,.801,.661],road:[.863,.833,.740],roadEdge:[.736,.724,.650],
@@ -77,9 +77,9 @@ export function makeEnvironment(){
  // Drill field oval marked with one neat border, without old crosshatched tiles.
  for(let i=0;i<64;i++){let a=i*2*Math.PI/64,b=(i+1)*2*Math.PI/64;segment(-20.8+Math.cos(a)*8.7,-2+Math.sin(a)*12.4,-20.8+Math.cos(b)*8.7,-2+Math.sin(b)*12.4,.18,.076,C.redDark)}
  // Primitive command platform removed; uploaded podium model is placed in CampProps.
- for(let i=0;i<5;i++)box(-28.2,.05,-3.3+i*1.8,.36,.22,.72,C.wood); // instructors' stands
+ // Removed five primitive instructor stands (unused rectangular placeholders).
  // Sandbags are drawn by CampProps at the original grenade-site position.
- box(-19,.05,-10.0,1.4,.11,.15,C.wood);
+ // Removed the lone primitive wooden strip in the grenade training zone.
  // 500 meter track with 5 parallel lanes and hurdles.
  for(let i=0;i<5;i++){segment(1.2,8+i*.72,22.6,8+i*.72,.075,.084,C.white)}
  // Primitive hurdles removed; uploaded hurdle GLBs are placed in CampProps.
@@ -92,7 +92,7 @@ export function makeEnvironment(){
  // Primitive signboards removed; uploaded signboard GLBs are placed in CampProps.
  // Company assembly plaza, one parade canopy and markers.
  box(15,.026,-8.2,16.2,.027,4.8,C.sand);
- for(let i=0;i<3;i++)box(7.8,.05,-9.7+i*1.2,.11,.65,.11,C.iron);
+ // Removed three primitive assembly-area marker posts (unused placeholders).
  // Fitness park. Parallel bars and pull-up bars.
  // Primitive pull-up bars removed; uploaded pull-up bar GLBs are placed in CampProps.
  // Static training items around the site.

@@ -1,6 +1,6 @@
 // Army v0.7.6 — shared world geometry, independently chosen map orientation.
 // Minimap is camera-aligned; full map uses a constant heading based on screenshot.
-import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=091';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=092';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
@@ -66,7 +66,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  for(let k=0;k<5;k++){
   const y=py(8.1+k*.71);ctx.beginPath();ctx.moveTo(px(1),y);ctx.lineTo(px(22.4),y);ctx.strokeStyle='#fff9dd';ctx.lineWidth=Math.max(.7,scale*.06);ctx.stroke();
  }
- rect(-22.0,-14.8,4.9,2.8,'#ae683c'); // command stand
+ rect(-17.6,-18.0,4.9,2.8,'#ae683c'); // command stand, aligned to the GLB
  // Distinct buildings, outlines, simple rooftop details.
  for(const b of BUILDINGS){const color=PAL[b.kind]||'#789e82';rect(b.x,b.z,b.w,b.d,color,'#4c6254');
   if(b.kind==='medic'&&!mini){ctx.strokeStyle='#c84845';ctx.lineWidth=Math.max(2,scale*.5);ctx.beginPath();ctx.moveTo(px(b.x)-6,py(b.z));ctx.lineTo(px(b.x)+6,py(b.z));ctx.moveTo(px(b.x),py(b.z)-6);ctx.lineTo(px(b.x),py(b.z)+6);ctx.stroke()}
