@@ -1,20 +1,24 @@
 // Army 0.7.9 — three shared Meshy buildings, nine camp locations.
 // Textured static GLBs are uploaded once per type, while each campus instance
 // has its own scale, rotation and a subtle identifying wall-color tint.
-import {BUILDINGS} from '../map/camp.js?v=082';
+import {BUILDINGS} from '../map/camp.js?v=086';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 const PLAN={
  barracks:{type:1,tint:[1,1,1]},armory:{type:1,tint:[.83,.93,.88]},
  office:{type:2,tint:[.87,.99,1.11]},canteen:{type:2,tint:[1.10,1.02,.78]},
- ammo:{type:3,tint:[1.09,.89,.87]},store:{type:3,tint:[1.08,1.06,.80]},
+ ammo:{type:4,tint:[1,1,1]},guard:{type:4,tint:[1,1,1]},
+ wash:{type:5,tint:[1,1,1]},
+ store:{type:3,tint:[1.08,1.06,.80]},
  medic:{type:3,tint:[1.10,.97,.97]},visitor:{type:3,tint:[.88,1.04,1.14]},
  chem:{type:3,tint:[.82,1.11,1.03]}
 };
 export const BUILDING_MODELS=[
  {id:1,url:'./assets/buildings/building-1-barracks.glb?v=081'},
  {id:2,url:'./assets/buildings/building-2-community.glb?v=081'},
- {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=081'}
+ {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=081'},
+ {id:4,url:'./assets/buildings/building-4-guardhouse.glb?v=086'},
+ {id:5,url:'./assets/buildings/building-5-wash.glb?v=086'}
 ];
 // Meshy output is front-facing +Z. Follow each actual doorway/interaction waypoint.
 function faceAngle(b){

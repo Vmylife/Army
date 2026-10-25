@@ -1,6 +1,6 @@
 // Army v0.8.2 — old decorative stand-ins replaced by Meshy assets at the same coordinates.
 // All gameplay geometry is derived from camp.js, so the two maps stay in sync.
-import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=082';
+import {CAMP,PERIMETER,ZONES,BUILDINGS} from './camp.js?v=086';
 import {ROAD_EDGE_TRIANGLES,ROAD_FILL_TRIANGLES} from './roadMesh.js?v=071';
 const C={
  grass:[.674,.764,.615],lightGrass:[.716,.801,.661],road:[.863,.833,.740],roadEdge:[.736,.724,.650],
@@ -60,21 +60,8 @@ export function makeEnvironment(){
  function obstacles(x,z){for(let k=0;k<4;k++){const xx=x+k*2.45;box(xx-.75,.03,z,.13,1.30,.15,C.wood);box(xx+.75,.03,z,.13,1.30,.15,C.wood);box(xx,1.18,z,1.62,.11,.18,C.wood)}}
  function signage(x,z,color){box(x,.06,z,.12,1.48,.12,C.wood);box(x,1.12,z,1.85,.60,.15,color);box(x,1.38,z+.10,1.12,.08,.04,C.cream)}
 
- // Ground (continuous and fast to render). Fence traces the blueprint's perimeter.
+ // Ground (continuous and fast to render). Fence visuals are now drawn with uploaded GLB sections in CampProps.
  box(0,-.32,0,CAMP.width,.31,CAMP.depth,C.grass);
- for(let i=0;i<PERIMETER.length;i++){
-  const a=PERIMETER[i],b=PERIMETER[(i+1)%PERIMETER.length];
-  const dist=Math.hypot(b[0]-a[0],b[1]-a[1]);if(!dist)continue;
-  // Entrance has a break in the southern fence near x=0.
-  if(a[1]<-20&&b[1]<-20&&((a[0]<0&&b[0]>0)||(a[0]>0&&b[0]<0))){
-   const t=(0-a[0])/(b[0]-a[0]),cut1=[a[0]+(b[0]-a[0])*Math.max(0,t-.05),a[1]+(b[1]-a[1])*Math.max(0,t-.05)],cut2=[a[0]+(b[0]-a[0])*Math.min(1,t+.05),a[1]+(b[1]-a[1])*Math.min(1,t+.05)];
-   for(const [p,q] of [[a,cut1],[cut2,b]]){const n=Math.max(1,Math.ceil(Math.hypot(q[0]-p[0],q[1]-p[1])/2));for(let t=0;t<=n;t++){let x=p[0]+(q[0]-p[0])*t/n,z=p[1]+(q[1]-p[1])*t/n;box(x,.04,z,.10,1.08,.10,C.wood)}}continue;
-  }
-  const dx=b[0]-a[0],dz=b[1]-a[1],n=Math.max(1,Math.ceil(dist/2));
-  for(let t=0;t<=n;t++){const px=a[0]+dx*t/n,pz=a[1]+dz*t/n;box(px,.04,pz,.10,1.1,.10,C.wood)}
-  const cnt=Math.ceil(dist/3.5);for(let t=0;t<cnt;t++){let xx=a[0]+dx*(t+.5)/cnt,zz=a[1]+dz*(t+.5)/cnt;
-   segment(xx-dx/cnt*.45,zz-dz/cnt*.45,xx+dx/cnt*.45,zz+dz/cnt*.45,.045,1.10,C.dark)}
- }
  // ZONES footprints do not overlap (single-combat / 500m obstacle are disjoint).
  // Especially the grenade throwing area overlaps the main drill field in plan view.
  for(const zone of ZONES){const color=hex(zone.color);
@@ -95,64 +82,30 @@ export function makeEnvironment(){
  box(-19,.05,-10.0,1.4,.11,.15,C.wood);
  // 500 meter track with 5 parallel lanes and hurdles.
  for(let i=0;i<5;i++){segment(1.2,8+i*.72,22.6,8+i*.72,.075,.084,C.white)}
- obstacles(5.2,10.0);obstacles(14.1,10.0);
+ // Primitive hurdles removed; uploaded hurdle GLBs are placed in CampProps.
  // Rifle range with silhouette targets and firing platforms.
  for(let i=0;i<6;i++){const x=2.1+i*3.4;box(x,.052,16.8,2.20,.12,1.02,C.stone)} // Keep firing pads; target meshes are replaced.
  box(10.7,.05,24.4,22.5,.65,.7,C.olive); // dirt berm
  // Outdoor single-combat area: scattered sandbag cover and trenches.
  // Existing single-combat sandbag positions are now handled by CampProps.
  // Four rough old rectangular supply blocks are replaced by two crates and two barrels.
- for(const [x,z] of [[-4,18],[21,8],[29,8],[28,-18],[-10,-18],[-38,10]])signage(x,z,C.olive);
+ // Primitive signboards removed; uploaded signboard GLBs are placed in CampProps.
  // Company assembly plaza, one parade canopy and markers.
  box(15,.026,-8.2,16.2,.027,4.8,C.sand);
  for(let i=0;i<3;i++)box(7.8,.05,-9.7+i*1.2,.11,.65,.11,C.iron);
  // Fitness park. Parallel bars and pull-up bars.
- for(let i=0;i<4;i++){const x=15.9+i*2.9;box(x-.82,.04,-17,.10,1.68,.10,C.iron);box(x+.82,.04,-17,.10,1.68,.10,C.iron);box(x,1.69,-17,1.75,.10,.10,C.iron)}
+ // Primitive pull-up bars removed; uploaded pull-up bar GLBs are placed in CampProps.
  // Static training items around the site.
  // Removed primitive flowerbeds with conical plant spikes: not part of the new asset style.
  // Old simple pole lamps removed: CampProps reuses precisely these seven positions.
- for(const [x,z] of [[-32,-16],[-1,8],[27,-19],[33,13]])bench(x,z);
+ // Primitive benches removed; uploaded bench GLBs are placed in CampProps.
  // Secondary landscaping, away from walkways.
  // All primitive cone / triangular trees removed; replaced with Meshy trees.
  // A distant north ridgeline: low-poly foothill, not a Meshy model.
  // Removed primitive north-ridgeline cones too: they looked like ugly fake trees.
- // Gate mast, bilingual visual without texture fonts; detailed hut in BUILDINGS below.
- for(const x of [-2.9,2.9])box(x,.02,-21.9,.41,3.3,.4,C.olive);
- box(0,3.14,-21.9,6.55,.60,.55,C.olive);
- box(0,3.56,-21.9,3.1,.10,.12,C.gold);
- box(-.7,.05,-22.0,.14,4.1,.14,C.stone);
- box(-.18,3.72,-22.0,1.1,.65,.08,C.red);
+ // Primitive gate mast / flag stand removed; uploaded three-flag model is placed in CampProps.
 
- // Simple v0.6-style houses: clean solid walls, one roof, entrance and windows.
- // Detailed Meshy architecture can be added later without changing the camp layout.
- for(const b of BUILDINGS){
-  // Nine Meshy buildings are drawn separately using shared GLB assets.
-  if(b.id!=='wash' && b.id!=='guard')continue;
-  const p=P[b.kind]||P.barracks;
-  box(b.x,.035,b.z,b.w,b.h,b.d,p.wall);
-  box(b.x,b.h-.07,b.z,b.w+.22,.15,b.d+.22,p.trim);
-  // The same modest low-poly gable roof across all buildings.
-  ridged(b.x,b.z,b.w+.48,b.d+.46,b.h+.08,.39,p.roof);
-  const entry=b.entry||{x:b.x,z:b.z-b.d/2-1};
-  const frontX=Math.abs(entry.x-b.x)>Math.abs(entry.z-b.z);
-  if(frontX){
-   const sign=entry.x>=b.x?1:-1,fx=b.x+sign*(b.w/2+.065);
-   box(fx,.035,b.z,.13,1.52,.94,C.wood);
-   for(let k=-2;k<=2;k++){
-    if(k===0)continue;
-    const z=b.z+(k/3)*b.d*.78;
-    box(fx,.85,z,.15,.62,.61,C.blue);
-   }
-  }else{
-   const sign=entry.z>=b.z?1:-1,fz=b.z+sign*(b.d/2+.065);
-   box(b.x,.035,fz,1.00,1.53,.13,C.wood);
-   for(let k=-2;k<=2;k++){
-    if(k===0)continue;
-    const x=b.x+(k/3)*b.w*.77;
-    box(x,.87,fz,.64,.62,.15,C.blue);
-   }
-  }
- }
+ // Primitive wash/guard stand-ins removed; all buildings now render from shared GLB models.
  // Flagship military atmosphere without expensive 3D mesh imports.
 
  return {verts:new Float32Array(verts),cols:new Float32Array(cols),norms:new Float32Array(norms),count:verts.length/3,triangles};

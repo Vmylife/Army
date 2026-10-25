@@ -51,7 +51,7 @@ export class RifleRenderer{
   if(!this.weapon||!(actor.anim.rifleAim>.01))return;
   const gl=this.gl,recoil=Math.max(0,(actor.shotUntil-now)/90);
   // Weapon +X (GLB muzzle) is turned toward actor +Z. Both hands stay below head.
-  const local=mul(translation(-.105,1.001,.288),mul(rotateY(-.90),mul(translation(-.045*recoil,0,0),scale(.38))));
+  const local=mul(translation(-.085,1.002,.300),mul(rotateY(Math.PI/2),mul(translation(-.045*recoil,0,0),scale(.38))));
   const model=mul(mul(translation(actor.pos.x,0,actor.pos.z),rotateY(actor.angle)),local);
   gl.useProgram(this.program);gl.uniformMatrix4fv(this.vp,false,vp);gl.uniformMatrix4fv(this.model,false,model);
   gl.bindVertexArray(this.weapon.vao);gl.drawElements(gl.TRIANGLES,this.weapon.count,this.weapon.type,0);

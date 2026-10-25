@@ -1,15 +1,21 @@
 // Army 0.8.1 — decorative low-poly props shared across the camp.
-import {PROPS} from '../map/camp.js?v=085';
+import {PROPS} from '../map/camp.js?v=086';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 export const PROP_MODELS=[
- {id:'streetlamp',url:'./assets/props/streetlamp.glb?v=081'},
+ {id:'streetlamp',url:'./assets/props/streetlamp.glb?v=086'},
  {id:'treeA',url:'./assets/props/tree-a.glb?v=081'},
  {id:'treeB',url:'./assets/props/tree-b.glb?v=081'},
  {id:'sandbag',url:'./assets/props/sandbag.glb?v=081'},
  {id:'target',url:'./assets/props/target.glb?v=081'},
  {id:'crate',url:'./assets/props/crate.glb?v=081'},
- {id:'barrel',url:'./assets/props/barrel.glb?v=081'}
+ {id:'barrel',url:'./assets/props/barrel.glb?v=081'},
+ {id:'bench',url:'./assets/props/bench.glb?v=086'},
+ {id:'signboard',url:'./assets/props/signboard.glb?v=086'},
+ {id:'hurdle',url:'./assets/props/hurdle.glb?v=086'},
+ {id:'pullup',url:'./assets/props/pullup.glb?v=086'},
+ {id:'flagpole',url:'./assets/props/flagpole.glb?v=086'},
+ {id:'fence',url:'./assets/props/fence.glb?v=086'}
 ];
 
 const VS=`#version 300 es

@@ -1,6 +1,6 @@
 // Army v0.7.6 — shared world geometry, independently chosen map orientation.
 // Minimap is camera-aligned; full map uses a constant heading based on screenshot.
-import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=072';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=086';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
@@ -82,7 +82,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
   // Crisp upright names placed directly over nearby buildings, not rotated
   // or mirrored with the map. Avoid covering the player marker and each other.
   const names={barracks:'營舍',office:'中山室',ammo:'彈藥庫',chem:'毒氣室',shop:'營站',
-   canteen:'餐廳',wash:'洗碗區',medic:'醫務所',armory:'軍械室',visitor:'會客室',guard:'崗哨'};
+   canteen:'餐廳',wash:'洗碗區',medic:'醫務所',armory:'軍械室',visitor:'會客室',guard:'哨口'};
   const radarR=width*.487, cx=width/2,cy=height/2;
   const close=BUILDINGS.map(b=>({b,label:names[b.kind]||b.label,pt:projected(b.x,b.z)}))
    .sort((a,b)=>Math.hypot(a.pt[0]-cx,a.pt[1]-cy)-Math.hypot(b.pt[0]-cx,b.pt[1]-cy));
@@ -104,7 +104,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
   ctx.restore();
  }
  if(!mini){
-  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43,-4],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2]];
+  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['彈藥庫',22.4,20.1],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43,-4],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2],['哨口',3.7,-19.5]];
   for(const [name,x,z] of names){const [sx,sy]=projected(x,z);const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,sx,sy);ctx.fillStyle='#344c3b';ctx.fillText(name,sx,sy)}
   // Compass shows actual geographical north after map alignment.
   const nx=-Math.sin(yaw),ny=Math.cos(yaw),cx=width-29,cy=27;
