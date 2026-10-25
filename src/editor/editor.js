@@ -1,4 +1,4 @@
-// Army independent scene editor v0.10.0.
+// Army independent scene editor v0.10.1.
 // Uses the current camp geometry and GLB renderers; does not load the gameplay loop.
 import '../map/layout99.js?v=099';
 import '../lighting96.js?v=096';
@@ -14,15 +14,17 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const round=(n,places=3)=>Number(n.toFixed(places));
 const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
 const copy=value=>JSON.parse(JSON.stringify(value));
-const storageKey='army-scene-editor-v0100-v099';
+const storageKey='army-scene-editor-v0101-v099';
+const previousStorageKey='army-scene-editor-v0100-v099';
 const names={streetlamp:'路燈',treeA:'樹木 A',treeB:'樹木 B',sandbag:'沙包',target:'靶子',crate:'木箱',barrel:'油桶',bench:'長椅',signboard:'標示牌',hurdle:'跨欄',pullup:'單槓',flagpole:'旗桿',podium:'司令台',fence:'圍欄',basketballHoop:'籃框',grenadeCrate:'手榴彈箱'};
 const baseFeatures=gameFeatures.map(x=>copy(x));
 const records=[];
 const byKey=new Map();
 let selected=null,renderer=null,buildings=null,props=null;
 let yaw=.65,pitch=.86,zoom=63,pivot={x:0,z:6};
-let loaded=false,changed=false,drag=null,orbitMode=false;
+let loaded=false,changed=false,drag=null,orbitMode=false,serial=0;
 const history=[],redoHistory=[];
+const originalDescriptors=[];
 
 // Build stable object identifiers; the model & gameplay camp are separate URL-versioned modules.
 for(let i=0;i<modelBuildings.length;i++){
@@ -30,7 +32,7 @@ for(let i=0;i<modelBuildings.length;i++){
  if(!other)continue;
  const base=copy(obj);
  const angle=Number.isFinite(obj.facingYaw)?obj.facingYaw:Math.atan2(obj.entry.x-obj.x,obj.entry.z-obj.z);
- const item={kind:'building',key:'building:'+obj.id,label:obj.label||obj.id,index:i,pair:[obj,other],base,yaw:angle,state:{x:obj.x,z:obj.z,yaw:angle,scale:1}};
+ const item={kind:'building',key:'building:'+obj.id,label:obj.label||obj.id,index:i,pair:[obj,other],base,yaw:angle,isNew:false,templateId:obj.id,state:{x:obj.x,z:obj.z,yaw:angle,scale:1}};
  records.push(item);byKey.set(item.key,item);
 }
 const countByType={};
@@ -39,13 +41,89 @@ for(let i=0;i<modelProps.length;i++){
  if(!other||other.type!==obj.type){console.warn('道具兩份清單排列不一致，跳過',i,obj.type);continue;}
  const n=countByType[obj.type]=(countByType[obj.type]||0)+1;
  const base=copy(obj),angle=Number.isFinite(obj.yaw)?obj.yaw:0;
- const item={kind:'prop',key:'prop:'+i,label:`${names[obj.type]||obj.type} #${n}`,index:i,type:obj.type,pair:[obj,other],base,yaw:angle,state:{x:obj.x,z:obj.z,yaw:angle,scale:1}};
+ const item={kind:'prop',key:'prop:'+i,label:`${names[obj.type]||obj.type} #${n}`,index:i,type:obj.type,pair:[obj,other],base,yaw:angle,isNew:false,templateId:obj.type,state:{x:obj.x,z:obj.z,yaw:angle,scale:1}};
  records.push(item);byKey.set(item.key,item);
 }
+// Immutable baseline for fresh resets, asset palette and deleted-object tracking.
+for(const r of records)originalDescriptors.push({key:r.key,kind:r.kind,label:r.label,index:r.index,type:r.type,templateId:r.templateId,isNew:false,base:copy(r.base),yaw:r.yaw});
+const originalKeys=new Set(originalDescriptors.map(r=>r.key));
+const defaultsByKey=new Map(originalDescriptors.map(r=>[r.key,r]));
+const buildingPalette=originalDescriptors.filter(r=>r.kind==='building');
+const propPalette=[...new Set(originalDescriptors.filter(r=>r.kind==='prop').map(r=>r.type))].map(t=>originalDescriptors.find(r=>r.kind==='prop'&&r.type===t));
+const finiteState=s=>s&&[s.x,s.z,s.yaw,s.scale].every(Number.isFinite)&&s.scale>0;
+function descriptorOf(r){return{kind:r.kind,key:r.key,label:r.label,index:r.index??null,type:r.type??null,templateId:r.templateId,isNew:r.isNew,base:copy(r.base),yaw:r.yaw,state:{...r.state}};}
+function sceneSnapshot(){return {schemaVersion:2,serial,objects:records.map(descriptorOf)};}
+function rebuildScene(scene){
+ if(!scene||scene.schemaVersion!==2||!Array.isArray(scene.objects))throw Error('配置資料格式不正確');
+ const savedKey=selected?.key;
+ const items=[];const seen=new Set();
+ for(const raw of scene.objects){
+  if(!raw||typeof raw.key!=='string'||seen.has(raw.key)||!['building','prop'].includes(raw.kind))continue;
+  const orig=defaultsByKey.get(raw.key);
+  const d=orig&&!raw.isNew?{...copy(orig),state:raw.state}:{...raw};
+  if(!d.base||!finiteState(d.state)||!Number.isFinite(d.yaw))continue;
+  if(d.kind==='building'&&!buildingPalette.some(x=>x.templateId===d.templateId))continue;
+  if(d.kind==='prop'&&!propPalette.some(x=>x.type===d.type))continue;
+  const left=copy(d.base),right=copy(d.base);
+  // Duplicated buildings intentionally retain their original model-lookup ID.
+  // Unique editor keys distinguish them; the final game integration will assign IDs.
+  const item={kind:d.kind,key:d.key,label:d.label,index:d.index,type:d.type,
+   templateId:d.templateId,isNew:!orig||Boolean(d.isNew),base:copy(d.base),yaw:d.yaw,
+   state:{...d.state},pair:[left,right]};
+  items.push(item);seen.add(item.key);
+ }
+ // Never replace source module arrays: every loader and renderer holds these references.
+ modelBuildings.splice(0,modelBuildings.length);
+ gameBuildings.splice(0,gameBuildings.length);
+ modelProps.splice(0,modelProps.length);
+ gameProps.splice(0,gameProps.length);
+ gameFeatures.splice(0,gameFeatures.length,...baseFeatures.map(copy));
+ records.splice(0,records.length);byKey.clear();
+ for(const r of items){
+  records.push(r);byKey.set(r.key,r);
+  const [a,b]=r.pair;
+  if(r.kind==='building'){modelBuildings.push(a);gameBuildings.push(b);}
+  else {modelProps.push(a);gameProps.push(b);}
+  apply(r);
+ }
+ serial=Math.max(Number.isInteger(scene.serial)?scene.serial:0,
+  ...records.map(r=>Number(r.key.match(/^new:(?:building|prop):(\d+)$/)?.[1])||0));
+ selected=byKey.get(savedKey)||null;
+ refreshMeshes();refreshFields();updateDetails();refreshList();changed=true;scheduleSave();
+}
+function selectedSource(category){return category==='building'?buildingPalette:propPalette;}
+function refreshTemplateList(){
+ const kind=$('newCategory').value,sel=$('newTemplate'),source=selectedSource(kind),old=sel.value;
+ sel.replaceChildren();
+ for(const d of source){const option=document.createElement('option');option.value=d.key;option.textContent=kind==='building'?d.label:(names[d.type]||d.type);sel.add(option)}
+ if(source.some(d=>d.key===old))sel.value=old;
+}
+function nextKey(kind){return `new:${kind}:${++serial}`;}
+function createFromDescriptor(source,{duplicate=false}={}){
+ if(!source)return;
+ const before=snapshot(),key=nextKey(source.kind),base=copy(source.base);
+ const state=duplicate?{...source.state,x:source.state.x+1.7,z:source.state.z+1.7}:
+   {x:clamp(pivot.x,-100,100),z:clamp(pivot.z,-100,100),yaw:source.yaw,scale:1};
+ const label=duplicate?source.label+'（複製）':(source.kind==='building'?source.label:names[source.type]||source.type)+'（新增）';
+ const d={key,kind:source.kind,label,index:null,type:source.type||null,templateId:source.templateId,
+  isNew:true,base,yaw:source.yaw,state};
+ const s=snapshot();s.objects.push(d);s.serial=serial;
+ rebuildScene(s);pushHistory(before);
+ select(byKey.get(key),{focus:true});refreshList();
+}
+function deleteSelected(){
+ if(!selected)return;
+ const label=selected.label;
+ const before=snapshot(),key=selected.key;
+ const newScene=snapshot();newScene.objects=newScene.objects.filter(r=>r.key!==key);
+ rebuildScene(newScene);pushHistory(before);
+ select(null);refreshList();
+ $('toolLabel').textContent=`已刪除 ${label}（可按復原取回）`;
+}
 function baseYaw(item){return item.yaw;}
-function isDifferent(item){const s=item.state,b=item.base;return Math.abs(s.x-b.x)>.0001||Math.abs(s.z-b.z)>.0001||Math.abs(s.yaw-baseYaw(item))>.0001||Math.abs(s.scale-1)>.0001;}
+function isDifferent(item){if(item.isNew)return true;const s=item.state,b=item.base;return Math.abs(s.x-b.x)>.0001||Math.abs(s.z-b.z)>.0001||Math.abs(s.yaw-baseYaw(item))>.0001||Math.abs(s.scale-1)>.0001;}
 function syncFeatures(item){
- if(item.kind!=='building')return;
+ if(item.kind!=='building'||item.isNew)return;
  const b=item.base,s=item.state;
  const a=s.yaw-item.yaw,c=Math.cos(a),si=Math.sin(a);
  for(let i=0;i<gameFeatures.length;i++){
@@ -95,10 +173,8 @@ function setItem(item,update,{updateUI=true}={}){
  if(updateUI&&selected===item){updateDetails();refreshFields();}
  scheduleSave();
 }
-function snapshot(){return Object.fromEntries(records.map(r=>[r.key,{...r.state}]));}
-function restore(s){for(const [key,v] of Object.entries(s||{})){const item=byKey.get(key);if(item&&v&&Object.values(v).every(Number.isFinite)){
-  item.state={x:v.x,z:v.z,yaw:v.yaw,scale:clamp(v.scale,.1,5)};apply(item);
- }}refreshMeshes();refreshFields();updateDetails();refreshList();changed=true;scheduleSave();}
+function snapshot(){return sceneSnapshot();}
+function restore(scene){rebuildScene(scene);}
 function pushHistory(s){history.push(s);if(history.length>45)history.shift();redoHistory.length=0;updateUndoButtons();}
 function updateUndoButtons(){$('undo').disabled=!history.length;$('redo').disabled=!redoHistory.length;}
 function undo(){if(!history.length)return;redoHistory.push(snapshot());restore(history.pop());updateUndoButtons();}
@@ -108,7 +184,7 @@ function scheduleSave(){if(persistQueued)return;persistQueued=true;requestAnimat
  persistQueued=false;
  try{localStorage.setItem(storageKey,JSON.stringify(snapshot()));}catch(err){console.warn('編輯器自動暫存失敗',err)}
  });}
-function changedCount(){return records.filter(isDifferent).length;}
+function changedCount(){return records.filter(isDifferent).length+originalKeys.size-records.filter(r=>originalKeys.has(r.key)).length;}
 function refreshList(){
  const q=$('search').value.trim().toLowerCase(),list=$('objectList'),value=selected?.key;
  list.replaceChildren();
@@ -118,7 +194,7 @@ function refreshList(){
   list.append(opt);
  }
  if(value&&[...list.options].some(o=>o.value===value))list.value=value;
- $('status').textContent=`調整 ${changedCount()} / ${records.length} 個`;
+ $('status').textContent=`場上 ${records.length} 件 · 異動 ${changedCount()}`;
 }
 function refreshFields(){
  const visible=Boolean(selected);$('fields').hidden=!visible;
@@ -143,14 +219,15 @@ function select(item,{focus=false}={}){
  if(focus&&item){pivot={x:item.state.x,z:item.state.z};zoom=clamp(item.kind==='building'?25:15,8,95);}
 }
 function exportLayout(){
- const result={format:'army-camp-layout',schemaVersion:1,baseVersion:'v0.9.9',editorVersion:'v0.10.0',exportedAt:new Date().toISOString(),
+ const result={format:'army-camp-layout',schemaVersion:2,baseVersion:'v0.9.9',editorVersion:'v0.10.1',exportedAt:new Date().toISOString(),
   note:'This is an editable preview snapshot; apply building collision, features, static shadows and other derived positions during integration.',
-  changedCount:changedCount(),
+  changedCount:changedCount(),deletedOriginals:originalDescriptors.filter(d=>!byKey.has(d.key)).map(d=>({key:d.key,kind:d.kind,id:d.kind==='building'?d.base.id:null,type:d.type??null,label:d.label,index:d.index})),
+  items:sceneSnapshot().objects,scene:sceneSnapshot(),
   buildings:records.filter(r=>r.kind==='building').map(r=>{
-   const s=r.state,o=r.pair[0];return{id:r.base.id,label:r.label,modified:isDifferent(r),x:round(s.x),z:round(s.z),yawRadians:round(s.yaw,6),angleDegrees:round(deg(s.yaw),2),scale:round(s.scale,4),w:round(o.w),d:round(o.d),h:round(o.h),entry:copy(o.entry||null)};
+   const s=r.state,o=r.pair[0];return{key:r.key,id:r.base.id,templateId:r.templateId,created:r.isNew,label:r.label,modified:isDifferent(r),x:round(s.x),z:round(s.z),yawRadians:round(s.yaw,6),angleDegrees:round(deg(s.yaw),2),scale:round(s.scale,4),w:round(o.w),d:round(o.d),h:round(o.h),entry:copy(o.entry||null)};
   }),
   props:records.filter(r=>r.kind==='prop').map(r=>{
-   const s=r.state,p=r.pair[0];return{index:r.index,type:r.type,label:r.label,modified:isDifferent(r),x:round(s.x),z:round(s.z),yawRadians:round(s.yaw,6),angleDegrees:round(deg(s.yaw),2),scaleMultiplier:round(s.scale,4),renderScale:round(p.scale??1,4),sx:p.sx===undefined?null:round(p.sx,4),sy:p.sy===undefined?null:round(p.sy,4),sz:p.sz===undefined?null:round(p.sz,4)};
+   const s=r.state,p=r.pair[0];return{key:r.key,index:r.index,type:r.type,created:r.isNew,label:r.label,modified:isDifferent(r),x:round(s.x),z:round(s.z),yawRadians:round(s.yaw,6),angleDegrees:round(deg(s.yaw),2),scaleMultiplier:round(s.scale,4),renderScale:round(p.scale??1,4),sx:p.sx===undefined?null:round(p.sx,4),sy:p.sy===undefined?null:round(p.sy,4),sz:p.sz===undefined?null:round(p.sz,4)};
   })
  };
  const blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob);
@@ -158,19 +235,27 @@ function exportLayout(){
 }
 async function importLayout(file){
  try{
-  if(file.size>3_000_000)throw Error('JSON 檔案太大');
+  if(file.size>5_000_000)throw Error('JSON 檔案太大');
   const obj=JSON.parse(await file.text());
-  if(obj?.format!=='army-camp-layout'||obj.schemaVersion!==1||!Array.isArray(obj.buildings)||!Array.isArray(obj.props))throw Error('不是本編輯器匯出的配置檔');
-  pushHistory(snapshot());
-  for(const b of obj.buildings){const item=byKey.get('building:'+b.id);if(!item)continue;
-   const {x,z,yawRadians,scale}=b;if([x,z,yawRadians,scale].every(Number.isFinite)){item.state={x,z,yaw:yawRadians,scale:clamp(scale,.1,5)};apply(item)}
-  }
-  for(const p of obj.props){const item=byKey.get('prop:'+p.index);if(!item||p.type!==item.type)continue;
-   const {x,z,yawRadians,scaleMultiplier}=p;if([x,z,yawRadians,scaleMultiplier].every(Number.isFinite)){item.state={x,z,yaw:yawRadians,scale:clamp(scaleMultiplier,.1,5)};apply(item)}
-  }
-  refreshMeshes();refreshList();refreshFields();updateDetails();scheduleSave();
-  alert('已載入配置！可以繼續調整。');
- }catch(err){alert('匯入失敗：'+err.message)}
+  if(obj?.format!=='army-camp-layout')throw Error('不是 Army 編輯器匯出的配置檔');
+  const before=snapshot();
+  if(obj.schemaVersion===2){
+   const data=obj.scene??{schemaVersion:2,serial:obj.serial??0,objects:obj.items};
+   if(!data||!Array.isArray(data.objects))throw Error('缺少 scene 或 items 清單');
+   rebuildScene(data);
+  }else if(obj.schemaVersion===1&&Array.isArray(obj.buildings)&&Array.isArray(obj.props)){
+   // Backward-compatible import of the first editor's position-only JSON files.
+   const legacy={schemaVersion:2,serial,objects:originalDescriptors.map(d=>({...copy(d),state:{x:d.base.x,z:d.base.z,yaw:d.yaw,scale:1}}))};
+   for(const b of obj.buildings){const d=legacy.objects.find(r=>r.key==='building:'+b.id);
+    if(d&&[b.x,b.z,b.yawRadians,b.scale].every(Number.isFinite))d.state={x:b.x,z:b.z,yaw:b.yawRadians,scale:clamp(b.scale,.1,5)};
+   }
+   for(const p of obj.props){const d=legacy.objects.find(r=>r.key==='prop:'+p.index);
+    if(d&&d.type===p.type&&[p.x,p.z,p.yawRadians,p.scaleMultiplier].every(Number.isFinite))d.state={x:p.x,z:p.z,yaw:p.yawRadians,scale:clamp(p.scaleMultiplier,.1,5)};
+   }
+   rebuildScene(legacy);
+  }else throw Error('不支援的編輯器配置版本');
+  pushHistory(before);alert('已載入配置！新增、刪除及移動的物件都會保留。');
+ }catch(err){alert('匯入失敗：'+err.message);console.error(err)}
 }
 function project(x,y,z){
  if(!renderer)return null;
@@ -283,10 +368,20 @@ function installControls(){
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();}
   else if((e.ctrlKey||e.metaKey)&&e.key==='y'){e.preventDefault();redo();}
   else if(e.code==='KeyF'&&selected){pivot={x:selected.state.x,z:selected.state.z};zoom=22;}
+  else if((e.code==='Delete'||e.code==='Backspace')&&selected){e.preventDefault();deleteSelected();}
+  else if((e.ctrlKey||e.metaKey)&&e.code==='KeyD'&&selected){e.preventDefault();createFromDescriptor(selected,{duplicate:true});}
   else if(e.code==='Escape'){select(null)}
  });
 }
 function installUI(){
+ $('newCategory').onchange=refreshTemplateList;
+ $('addObject').onclick=()=>{
+  const d=defaultsByKey.get($('newTemplate').value);
+  if(d)createFromDescriptor(d);
+ };
+ $('duplicateObject').onclick=()=>createFromDescriptor(selected,{duplicate:true});
+ $('deleteObject').onclick=deleteSelected;
+ refreshTemplateList();
  $('togglePanel').onclick=()=>$('editorPanel').classList.toggle('collapsed');
  $('centerMap').onclick=()=>{pivot={x:0,z:5};yaw=.65;pitch=.86;zoom=63};
  $('zoomIn').onclick=()=>setZoom(.8);$('zoomOut').onclick=()=>setZoom(1.25);
@@ -313,7 +408,7 @@ function installUI(){
  };
  $('resetOne').onclick=()=>{if(!selected)return;pushHistory(snapshot());selected.state={x:selected.base.x,z:selected.base.z,yaw:selected.yaw,scale:1};apply(selected);refreshMeshes(selected.kind);refreshFields();updateDetails();refreshList();scheduleSave();};
  $('resetAll').onclick=()=>{if(!confirm('確定要把編輯器內所有物件還原成原始位置？這不會改正式遊戲。'))return;
-  pushHistory(snapshot());for(const item of records){item.state={x:item.base.x,z:item.base.z,yaw:item.yaw,scale:1};apply(item)}
+  const before=snapshot();rebuildScene({schemaVersion:2,serial,objects:originalDescriptors.map(d=>({...copy(d),state:{x:d.base.x,z:d.base.z,yaw:d.yaw,scale:1}}))});pushHistory(before);
   refreshMeshes();refreshFields();updateDetails();refreshList();scheduleSave();
  };
  $('undo').onclick=undo;$('redo').onclick=redo;
@@ -341,7 +436,13 @@ async function boot(){
  installUI();installControls();
  try{
   renderer=new ArmyRenderer($('scene'));buildings=new CampBuildings(renderer.gl);props=new CampProps(renderer.gl);
-  try{const saved=JSON.parse(localStorage.getItem(storageKey)||'null');if(saved){for(const [key,s] of Object.entries(saved)){const item=byKey.get(key);if(item&&s&&[s.x,s.z,s.yaw,s.scale].every(Number.isFinite)){item.state={x:s.x,z:s.z,yaw:s.yaw,scale:clamp(s.scale,.1,5)};apply(item)}}refreshList();}}catch(err){console.warn('舊版編輯進度讀取失敗',err)}
+  try{
+   const raw=localStorage.getItem(storageKey);
+   if(raw){const saved=JSON.parse(raw);if(saved?.schemaVersion===2)rebuildScene(saved)}
+   else{const old=JSON.parse(localStorage.getItem(previousStorageKey)||'null');
+    if(old){const baseline=snapshot();for(const [key,v] of Object.entries(old)){const d=baseline.objects.find(r=>r.key===key);if(d&&finiteState(v))d.state={...v}}rebuildScene(baseline)}
+   }
+  }catch(err){console.warn('編輯進度讀取失敗',err)}
   startRenderLoop();
   // Load models independently: a bad GLB should not block all other objects.
   const all=[...BUILDING_MODELS.map(x=>({kind:'building',...x})),...PROP_MODELS.map(x=>({kind:'prop',...x}))];

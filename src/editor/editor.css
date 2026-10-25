@@ -20,3 +20,14 @@ button{background:#edf3e7;border:1px solid #c9d4c5;border-radius:9px;padding:9px
 .zoomButtons{position:fixed;left:14px;top:73px;display:flex;flex-direction:column;gap:7px;z-index:10}.zoomButtons button{font-size:20px;width:40px;height:40px;padding:0}
 #loading{position:fixed;z-index:40;left:50%;top:45%;transform:translate(-50%,-50%);background:#fffbedf4;padding:18px 24px;border-radius:15px;font-weight:650;min-width:210px;max-width:86vw;text-align:center;box-shadow:0 8px 30px #0002}
 @media(max-width:730px){.topbar{padding:7px 9px}.topbar strong{font-size:14px}.topbar small{font-size:10px}.topActions button,.topActions a{font-size:10px;padding:8px}.topActions{gap:4px}#editorPanel{top:62px;bottom:9px;width:min(285px,80vw);right:7px}.instructions{left:6px;right:6px;max-width:none;bottom:5px;font-size:9px;gap:1px;padding:5px 7px}.instructions span:last-child{display:none}.zoomButtons{top:63px;left:5px}}
+
+/* v0.10.1 scene palette and destructive-action controls */
+.createTools{padding:11px;background:#e8f0e3;border:1px solid #cbd8c6;border-radius:12px;margin:0 0 13px}
+.createTools>strong{font-size:13px;display:block;margin-bottom:7px}
+.createTools label{font-size:11px;display:block;font-weight:650;color:#537261}
+.createTools select{margin-top:5px;width:100%;background:white;padding:9px 6px;border:1px solid #c4d2c4;border-radius:8px;color:#314438;font-size:12px}
+.createTools .twoCols{grid-template-columns:.85fr 1.15fr}
+.createTools .block{margin-top:10px}
+.miniTip{font-size:10.5px;line-height:1.45;margin:8px 0 0;color:#6b806e}
+button.danger{color:#a2372d;background:#fff2ed;border-color:#ecbdb7}
+button.danger:hover{background:#f6d8d1}
