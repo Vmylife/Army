@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>軍營戰鬥展示 v0.1</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1e1e1e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #ui-layer {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 12px 28px;
+      border-radius: 10px;
+      color: #fff;
+      user-select: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .hp-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 180px;
+    }
+    .bar {
+      width: 100%;
+      height: 14px;
+      background: #2b2b2b;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .fill-green { width: 100%; height: 100%; background: #4caf50; transition: width 0.2s; }
+    .fill-red { width: 100%; height: 100%; background: #f44336; transition: width 0.2s; }
+    #result-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 30px 60px;
+      border-radius: 14px;
+      text-align: center;
+      color: white;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    button.btn-restart {
+      margin-top: 18px;
+      padding: 10px 24px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    button.btn-restart:hover {
+      background: #1976d2;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui-layer">
+    <div class="hp-box">
+      <span>己方士兵 (綠)</span>
+      <div class="bar"><div id="hp-green" class="fill-green"></div></div>
+    </div>
+    <div style="font-weight: bold; font-size: 22px; color: #ffeb3b;">VS</div>
+    <div class="hp-box">
+      <span>敵軍士兵 (紅)</span>
+      <div class="bar"><div id="hp-red" class="fill-red"></div></div>
+    </div>
+  </div>
+
+  <div id="result-box">
+    <h2 id="winner-text" style="margin: 0 0 10px 0;">勝負結算</h2>
+    <button class="btn-restart" id="btn-restart">重新開始戰鬥</button>
+  </div>
+
+  <canvas id="game-canvas"></canvas>
+
+  <script type="module">
+    import { ArmyRenderer } from './src/core/renderer.js';
+    import { GlbLoader } from './src/core/glb.js';
+    import { CombatScene } from './src/combat/combatScene.js';
+
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new ArmyRenderer(canvas);
+    const glbLoader = new GlbLoader();
+
+    const hpGreen = document.getElementById('hp-green');
+    const hpRed = document.getElementById('hp-red');
+    const resultBox = document.getElementById('result-box');
+    const winnerText = document.getElementById('winner-text');
+    const btnRestart = document.getElementById('btn-restart');
+
+    const combat = new CombatScene(renderer, glbLoader);
+
+    await combat.init({
+      onUpdateHP: (green, red) => {
+        hpGreen.style.width = Math.max(0, green) + '%';
+        hpRed.style.width = Math.max(0, red) + '%';
+      },
+      onGameOver: (ended, winner) => {
+        if (ended) {
+          winnerText.innerText = winner;
+          resultBox.style.display = 'block';
+        } else {
+          resultBox.style.display = 'none';
+        }
+      }
+    });
+
+    btnRestart.addEventListener('click', () => {
+      combat.reset();
+    });
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      combat.update(dt, now / 1000);
+      
+      renderer.clear();
+      combat.render();
+
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
