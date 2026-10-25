@@ -2,7 +2,9 @@ import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=0
 import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=082';
 import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=082';
-import {RigAnimator} from './characters/rigAnimator.js?v=077';
+import {RigAnimator} from './characters/rigAnimator.js?v=084';
+import {RifleRenderer} from './battle/rifleRenderer.js?v=084';
+import {updateRangeShooter,createRangeAudio} from './battle/rangeTraining.js?v=084';
 import {CAMP,moveWithCollision} from './map/camp.js?v=082';
 import {drawMinimap} from './ui/minimap.js?v=076';
 import {initWorldMap} from './ui/worldMap.js?v=076';
@@ -35,14 +37,14 @@ const NPC_SPOTS=[
   {x:10,z:0,r:3,job:'patrol'}, {x:17,z:0,r:3,job:'patrol'},
   {x:9,z:-9,r:2.1,job:'chat'}, {x:13,z:-9,r:2.1,job:'chat'},
   {x:16,z:-14,r:2.2,job:'train'}, {x:21,z:-14,r:2.2,job:'train'},
-  {x:6,z:13,r:3,job:'patrol'}, {x:17,z:13,r:2,job:'chat'},
+  {x:5.5,z:16.8,r:0,job:'shoot'}, {x:12.3,z:16.8,r:0,job:'shoot'},
   {x:-30,z:-14,r:2,job:'patrol'}, {x:-4,z:-7,r:2,job:'patrol'},
 ];
 function createCampNPCs(glb){
  return NPC_SPOTS.map((s,i)=>{
   const anim=new RigAnimator(glb);
   anim.setClip('Idle');anim.evaluate(0);
-  const px=s.x+(i%2?-.35:.35),pz=s.z+((i%3)-1)*.35;
+  const px=s.job==='shoot'?s.x:s.x+(i%2?-.35:.35),pz=s.job==='shoot'?s.z:s.z+((i%3)-1)*.35;
   return {pos:{x:px,z:pz},angle:(i%5)*1.2,anim,home:s,
     tx:px,tz:pz,state:'pause',until:0,nextEval:0,
     seed:i*19+7,phase:i*1.23};
@@ -57,6 +59,7 @@ function updateCampNPCs(npcs,dt,now,playerPos){
   const elapsed=Math.min(.20,(now-(n.lastUpdate??now))/1000);
   n.lastUpdate=now;n.nextEval=now+interval+(i%4)*7;
   const activity=n.home.job;
+  if(activity==='shoot'){updateRangeShooter(n,now);n.anim.evaluate(elapsed);continue;}
   if(n.state==='pause'&&now>=n.until){
    const q=n.phase+now*.00019;
    const radius=n.home.r*(.30+.4*((Math.sin(q*1.6)+1)*.5));
@@ -93,6 +96,9 @@ async function boot(){
   step='下載主角 GLB';status('載入阿兵哥…');
   const heroGlb=await stage(loadGlb(modelUrl),'主角模型');
   step='建立主角貼圖';await stage(renderer.addModel('recruit',heroGlb),'主角貼圖');
+  const rifleRenderer=new RifleRenderer(renderer.gl);
+  loadGlb('./assets/weapons/rifle.glb?v=084').then(g=>rifleRenderer.addModel(g)).catch(err=>console.warn('步槍模型載入失敗（不影響軍營）',err));
+  const playRangeShot=createRangeAudio();
   // Load each of the three building meshes once; reuse them at all nine locations.
   // Model downloads run in parallel; failure does not block the controllable soldier.
   const buildings=new CampBuildings(renderer.gl);
@@ -163,7 +169,11 @@ async function boot(){
     buildings.draw(renderer.vp,player.pos);
     props.draw(renderer.vp,player.pos);
     renderer.drawActor('recruit',player);
-    for(const npc of npcs){if(Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z)<28)renderer.drawActor('recruit',npc);}
+    for(const npc of npcs){
+      const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
+      if(npc.shotPending){npc.shotPending=false;playRangeShot(distance)}
+      if(distance<28){renderer.drawActor('recruit',npc);if(npc.home.job==='shoot')rifleRenderer.draw(renderer.vp,npc,now)}
+    }
 
     mapFacing=Math.PI-player.angle+mapYaw;
     // 60 Hz radar refresh (previously 10 Hz). World-map preview refreshes only while open.
