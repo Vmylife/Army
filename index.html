@@ -20,6 +20,11 @@
 <div id="notice" role="status">載入阿兵哥…</div>
 <div id="fatal" role="alert" hidden><strong>遊戲無法啟動</strong><p id="errorText"></p><button type="button" id="retry">重新載入</button></div>
 <div id="debug" hidden></div>
-<script type="module" src="./src/main.js?v=093"></script>
+<!-- Import map redirects the existing renderer's ground-only import.
+     v0.9.3 buildings, AI, models, and collisions are untouched. -->
+<script type="importmap">
+{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground94.js?v=094"}}
+</script>
+<script type="module" src="./src/main.js?v=094"></script>
 </body>
 </html>
