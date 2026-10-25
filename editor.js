@@ -1,13 +1,13 @@
-// Army independent scene editor v0.10.1.
+// Army independent scene editor v0.10.2 (root-level deployment fix).
 // Uses the current camp geometry and GLB renderers; does not load the gameplay loop.
-import '../map/layout99.js?v=099';
-import '../lighting96.js?v=096';
-import {BUILDINGS as modelBuildings,PROPS as modelProps} from '../map/camp.js?v=092';
-import {BUILDINGS as gameBuildings,PROPS as gameProps,FEATURES as gameFeatures} from '../map/camp.js?v=093';
-import {ArmyRenderer} from '../core/renderer.js?v=092';
-import {CampBuildings,BUILDING_MODELS} from '../buildings/buildingRenderer.js?v=093';
-import {CampProps,PROP_MODELS} from '../props/propRenderer.js?v=092';
-import {loadGlb} from '../core/glb.js?v=060';
+import './src/map/layout99.js?v=099';
+import './src/lighting96.js?v=096';
+import {BUILDINGS as modelBuildings,PROPS as modelProps} from './src/map/camp.js?v=092';
+import {BUILDINGS as gameBuildings,PROPS as gameProps,FEATURES as gameFeatures} from './src/map/camp.js?v=093';
+import {ArmyRenderer} from './src/core/renderer.js?v=092';
+import {CampBuildings,BUILDING_MODELS} from './src/buildings/buildingRenderer.js?v=093';
+import {CampProps,PROP_MODELS} from './src/props/propRenderer.js?v=092';
+import {loadGlb} from './src/core/glb.js?v=060';
 
 const $=id=>document.getElementById(id);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -100,7 +100,7 @@ function refreshTemplateList(){
 }
 function nextKey(kind){return `new:${kind}:${++serial}`;}
 function createFromDescriptor(source,{duplicate=false}={}){
- if(!source)return;
+ if(!source){$('toolLabel').textContent='請先選取物件，才能複製';return;}
  const before=snapshot(),key=nextKey(source.kind),base=copy(source.base);
  const state=duplicate?{...source.state,x:source.state.x+1.7,z:source.state.z+1.7}:
    {x:clamp(pivot.x,-100,100),z:clamp(pivot.z,-100,100),yaw:source.yaw,scale:1};
@@ -110,15 +110,16 @@ function createFromDescriptor(source,{duplicate=false}={}){
  const s=snapshot();s.objects.push(d);s.serial=serial;
  rebuildScene(s);pushHistory(before);
  select(byKey.get(key),{focus:true});refreshList();
+ $('toolLabel').textContent=`已${duplicate?'複製':'新增'} ${label}，場景目前共有 ${records.length} 件物件`;
 }
 function deleteSelected(){
- if(!selected)return;
+ if(!selected){$('toolLabel').textContent='請先從清單或場景選取想刪除的物件';return;}
  const label=selected.label;
  const before=snapshot(),key=selected.key;
  const newScene=snapshot();newScene.objects=newScene.objects.filter(r=>r.key!==key);
  rebuildScene(newScene);pushHistory(before);
  select(null);refreshList();
- $('toolLabel').textContent=`已刪除 ${label}（可按復原取回）`;
+ $('toolLabel').textContent=`已刪除 ${label}（可按復原取回），剩餘 ${records.length} 件`;
 }
 function baseYaw(item){return item.yaw;}
 function isDifferent(item){if(item.isNew)return true;const s=item.state,b=item.base;return Math.abs(s.x-b.x)>.0001||Math.abs(s.z-b.z)>.0001||Math.abs(s.yaw-baseYaw(item))>.0001||Math.abs(s.scale-1)>.0001;}
@@ -219,7 +220,7 @@ function select(item,{focus=false}={}){
  if(focus&&item){pivot={x:item.state.x,z:item.state.z};zoom=clamp(item.kind==='building'?25:15,8,95);}
 }
 function exportLayout(){
- const result={format:'army-camp-layout',schemaVersion:2,baseVersion:'v0.9.9',editorVersion:'v0.10.1',exportedAt:new Date().toISOString(),
+ const result={format:'army-camp-layout',schemaVersion:2,baseVersion:'v0.9.9',editorVersion:'v0.10.2',exportedAt:new Date().toISOString(),
   note:'This is an editable preview snapshot; apply building collision, features, static shadows and other derived positions during integration.',
   changedCount:changedCount(),deletedOriginals:originalDescriptors.filter(d=>!byKey.has(d.key)).map(d=>({key:d.key,kind:d.kind,id:d.kind==='building'?d.base.id:null,type:d.type??null,label:d.label,index:d.index})),
   items:sceneSnapshot().objects,scene:sceneSnapshot(),
@@ -377,7 +378,7 @@ function installUI(){
  $('newCategory').onchange=refreshTemplateList;
  $('addObject').onclick=()=>{
   const d=defaultsByKey.get($('newTemplate').value);
-  if(d)createFromDescriptor(d);
+  if(d)createFromDescriptor(d);else $('toolLabel').textContent='素材清單是空的，請重新選擇分類';
  };
  $('duplicateObject').onclick=()=>createFromDescriptor(selected,{duplicate:true});
  $('deleteObject').onclick=deleteSelected;
