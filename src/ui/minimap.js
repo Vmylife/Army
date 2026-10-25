@@ -1,4 +1,4 @@
-import {drawCampMap} from '../map/mapDrawing.js?v=086';
+import {drawCampMap} from '../map/mapDrawing.js?v=088';
 const canvas=document.getElementById('miniCanvas'),ctx=canvas?.getContext('2d');
 export function drawMinimap(player,enemy=null,dead=false,heading=0,cameraYaw=0){
  if(!ctx)return;

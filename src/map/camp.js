@@ -162,7 +162,8 @@ export const PROPS = [
  ...ENTRANCE_SIGNS,
  ...TRAINING_HURDLES,
  ...FITNESS_BARS,
- {type:'flagpole',x:-18.6,z:7.0,scale:1.20,yaw:0,cull:76},
+ {type:'podium',x:-20.8,z:8.0,scale:2.05,yaw:0,cull:96},
+ {type:'flagpole',x:-26.3,z:8.0,scale:3.85,yaw:0,cull:110},
  ...PERIMETER_FENCE,
  // Trees: replace ugly old primitive trees and keep them a bit larger / denser.
  ...[[-42,13,1],[-43,-17,1.1],[-37,17,.9],[-28,21,1.1],[-10,23,1.0],

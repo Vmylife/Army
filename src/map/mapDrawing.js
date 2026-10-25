@@ -66,7 +66,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  for(let k=0;k<5;k++){
   const y=py(8.1+k*.71);ctx.beginPath();ctx.moveTo(px(1),y);ctx.lineTo(px(22.4),y);ctx.strokeStyle='#fff9dd';ctx.lineWidth=Math.max(.7,scale*.06);ctx.stroke();
  }
- rect(-21,6.8,2.5,2,'#ae683c'); // command stand
+ rect(-20.8,8.0,2.8,2.2,'#ae683c'); // command stand
  // Distinct buildings, outlines, simple rooftop details.
  for(const b of BUILDINGS){const color=PAL[b.kind]||'#789e82';rect(b.x,b.z,b.w,b.d,color,'#4c6254');
   if(b.kind==='medic'&&!mini){ctx.strokeStyle='#c84845';ctx.lineWidth=Math.max(2,scale*.5);ctx.beginPath();ctx.moveTo(px(b.x)-6,py(b.z));ctx.lineTo(px(b.x)+6,py(b.z));ctx.moveTo(px(b.x),py(b.z)-6);ctx.lineTo(px(b.x),py(b.z)+6);ctx.stroke()}

@@ -1,5 +1,5 @@
 // Army 0.8.1 — decorative low-poly props shared across the camp.
-import {PROPS} from '../map/camp.js?v=087';
+import {PROPS} from '../map/camp.js?v=088';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 export const PROP_MODELS=[
@@ -15,6 +15,7 @@ export const PROP_MODELS=[
  {id:'hurdle',url:'./assets/props/hurdle.glb?v=086'},
  {id:'pullup',url:'./assets/props/pullup.glb?v=086'},
  {id:'flagpole',url:'./assets/props/flagpole.glb?v=086'},
+ {id:'podium',url:'./assets/props/podium.glb?v=088'},
  {id:'fence',url:'./assets/props/fence.glb?v=086'}
 ];
 

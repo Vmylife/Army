@@ -76,7 +76,7 @@ export function makeEnvironment(){
  // Major training grounds and decorations.
  // Drill field oval marked with one neat border, without old crosshatched tiles.
  for(let i=0;i<64;i++){let a=i*2*Math.PI/64,b=(i+1)*2*Math.PI/64;segment(-20.8+Math.cos(a)*8.7,-2+Math.sin(a)*12.4,-20.8+Math.cos(b)*8.7,-2+Math.sin(b)*12.4,.18,.076,C.redDark)}
- box(-22,.05,7.0,2.0,.36,1.3,C.tan);box(-22,.42,7,.60,.23,.55,C.redDark);  // command platform
+ // Primitive command platform removed; uploaded podium model is placed in CampProps.
  for(let i=0;i<5;i++)box(-28.2,.05,-3.3+i*1.8,.36,.22,.72,C.wood); // instructors' stands
  // Sandbags are drawn by CampProps at the original grenade-site position.
  box(-19,.05,-10.0,1.4,.11,.15,C.wood);
