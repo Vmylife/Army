@@ -26,7 +26,66 @@ function movement(mag){
  return {clip:'RunFast',speed:lerp(options.runSpeed,options.sprintSpeed,(mag-options.sprintThreshold)/(1-options.sprintThreshold)),rate:lerp(1.3,1.56,mag)};
 }
 const modelUrl='./assets/characters/cadet/cadet-green.glb?v=077';
-const redTextureUrl='./assets/characters/cadet/cadet-red-texture.jpg?v=077';
+
+// Friendlies reuse the same green GLB, skinning buffers and texture.
+// Small independent activity zones; no clock schedule and no hostile red soldier.
+const NPC_SPOTS=[
+  {x:-23,z:0,r:4,job:'march'}, {x:-18,z:-1,r:4,job:'march'},
+  {x:-28,z:1,r:3,job:'train'}, {x:-27,z:-5,r:3,job:'train'},
+  {x:10,z:0,r:3,job:'patrol'}, {x:17,z:0,r:3,job:'patrol'},
+  {x:9,z:-9,r:2.1,job:'chat'}, {x:13,z:-9,r:2.1,job:'chat'},
+  {x:16,z:-14,r:2.2,job:'train'}, {x:21,z:-14,r:2.2,job:'train'},
+  {x:6,z:13,r:3,job:'patrol'}, {x:17,z:13,r:2,job:'chat'},
+  {x:-30,z:-14,r:2,job:'patrol'}, {x:-4,z:-7,r:2,job:'patrol'},
+];
+function createCampNPCs(glb){
+ return NPC_SPOTS.map((s,i)=>{
+  const anim=new RigAnimator(glb);
+  anim.setClip('Idle');anim.evaluate(0);
+  const px=s.x+(i%2?-.35:.35),pz=s.z+((i%3)-1)*.35;
+  return {pos:{x:px,z:pz},angle:(i%5)*1.2,anim,home:s,
+    tx:px,tz:pz,state:'pause',until:0,nextEval:0,
+    seed:i*19+7,phase:i*1.23};
+ });
+}
+function updateCampNPCs(npcs,dt,now,playerPos){
+ for(let i=0;i<npcs.length;i++){
+  const n=npcs[i],d=Math.hypot(n.pos.x-playerPos.x,n.pos.z-playerPos.z);
+  // Less frequent updates for distant soldiers: keep mobile WebGL2 responsive.
+  const interval=d>30?700:d>18?145:65;
+  if(now<n.nextEval)continue;
+  const elapsed=Math.min(.20,(now-(n.lastUpdate??now))/1000);
+  n.lastUpdate=now;n.nextEval=now+interval+(i%4)*7;
+  const activity=n.home.job;
+  if(n.state==='pause'&&now>=n.until){
+   const q=n.phase+now*.00019;
+   const radius=n.home.r*(.30+.4*((Math.sin(q*1.6)+1)*.5));
+   n.tx=n.home.x+Math.cos(q*2.3)*radius;
+   n.tz=n.home.z+Math.sin(q*2.3)*radius;
+   n.state='move';
+  }
+  if(n.state==='move'){
+   const dx=n.tx-n.pos.x,dz=n.tz-n.pos.z,dist=Math.hypot(dx,dz);
+   if(dist<.25){n.state='pause';n.until=now+(activity==='chat'?3600:activity==='train'?2600:1000)+((i*569)%1900);}
+   else {
+    const speed=activity==='march'?1.35:activity==='patrol'?1.25:.8;
+    const mx=dx/dist,mz=dz/dist;
+    const moved=moveWithCollision(n.pos,mx*speed*elapsed,mz*speed*elapsed);
+    if(Math.hypot(moved.x-n.pos.x,moved.z-n.pos.z)<.005){n.state='pause';n.until=now+1200;}
+    else {n.pos=moved;face(n,mx,mz)}
+   }
+  }
+  let clip=n.state==='move'?'Walking':'Idle';
+  if(n.state==='pause'&&activity==='train'){
+   const chosen=['push_up','situps','Idle'][i%3];
+   if(n.anim.hasClip(chosen))clip=chosen;
+  }
+  if(n.anim.clip!==clip)n.anim.setClip(clip);
+  n.anim.speed=n.state==='move'?(activity==='march'?1.15:1):1;
+  n.anim.evaluate(elapsed);
+ }
+}
+
 async function boot(){
  let step='準備 WebGL';
  try{
@@ -50,8 +109,8 @@ async function boot(){
      .catch(err=>{console.error('道具載入失敗',err);status('部分道具載入失敗，請確認 assets/props 已完整上傳');setTimeout(()=>status(''),6500)});
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
   player.anim.setClip('Idle');player.anim.evaluate(0);
-  let foe=null;
-  // Hero and red enemy share the same rigged Meshy GLB; only the enemy base-color texture changes.
+  // 6-minute matches: no time-of-day schedule. Friendly NPCs do their own activities.
+  const npcs=createCampNPCs(heroGlb);
   let camYaw=options.cameraYaw,camPitch=options.cameraPitch;
   // Existing camera distance is the nearest zoom. Pinch/wheel may only zoom out to 2x.
   const minZoom=options.zoom,maxZoom=minZoom*2;
@@ -60,7 +119,7 @@ async function boot(){
     (dx,dy)=>{if(!worldMap.isOpen()){camYaw+=dx;camPitch=Math.max(.32,Math.min(1.12,camPitch+dy))}},
     ratio=>{if(!worldMap.isOpen()&&Number.isFinite(ratio)&&ratio>0)targetZoom=Math.max(minZoom,Math.min(maxZoom,targetZoom*ratio))}
   );
-  let last=performance.now(),lastMap=0,lastDebug=0,foePhase=0;
+  let last=performance.now(),lastMap=0,lastDebug=0;
   // Both maps use the SAME camera-aligned projection. Keep the map heading
   // stable while stationary; rotating only the camera never rotates the soldier arrow.
   let mapYaw=camYaw;
@@ -99,25 +158,18 @@ async function boot(){
     if(audition&&player.anim.clip!==audition)player.anim.setClip(audition);
     else if(!audition&&player.anim.clip!==m.clip)player.anim.setClip(m.clip);
     player.anim.speed=m.rate;player.anim.evaluate(dt);
-    if(foe){
-     foePhase+=dt*.34;
-     const tx=CAMP.enemySpawn.x+Math.cos(foePhase)*.9-.9,tz=CAMP.enemySpawn.z+Math.sin(foePhase)*.7;
-     const dx=tx-foe.pos.x,dz=tz-foe.pos.z;
-     foe.pos.x+=dx*Math.min(1,dt*1.5);foe.pos.z+=dz*Math.min(1,dt*1.5);
-     if(Math.hypot(dx,dz)>.015)face(foe,dx,dz);
-     foe.anim.evaluate(dt);
-    }
+    updateCampNPCs(npcs,dt,now,player.pos);
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
     buildings.draw(renderer.vp,player.pos);
     props.draw(renderer.vp,player.pos);
     renderer.drawActor('recruit',player);
-    if(foe)renderer.drawActor('red',foe);
+    for(const npc of npcs){if(Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z)<28)renderer.drawActor('recruit',npc);}
 
     mapFacing=Math.PI-player.angle+mapYaw;
     // 60 Hz radar refresh (previously 10 Hz). World-map preview refreshes only while open.
     if(now-lastMap>=16){
-      if(!worldMap.isOpen())drawMinimap(player.pos,foe?.pos||null,false,mapFacing,mapYaw);
-      worldMap.update(player.pos,foe?.pos||null,player.angle);
+      if(!worldMap.isOpen())drawMinimap(player.pos,null,false,mapFacing,mapYaw);
+      worldMap.update(player.pos,null,player.angle);
       lastMap=now;
     }
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`mode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
@@ -125,12 +177,6 @@ async function boot(){
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}
   }
   requestAnimationFrame(tick);
-  // An optional enemy never prevents joystick/game initialization.
-  try{
-   await renderer.addModel('red',heroGlb,{textureUrl:redTextureUrl});
-   foe={pos:{...CAMP.enemySpawn},angle:Math.PI,anim:new RigAnimator(heroGlb)};
-   foe.anim.setClip('Walking');foe.anim.evaluate(0);
-  }catch(error){console.warn('敵人載入失敗，主角仍可遊玩',error)}
 
  }catch(error){console.error('Army 啟動階段',step,error);errorMessage(step+'：'+String(error.message||error))}
 }
