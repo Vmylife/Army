@@ -45,7 +45,10 @@ export const ZONES = [
 // Solid buildings only; pavilions & outdoor apparatus remain walkable.
 export const BUILDINGS = [
  {id:'barracks', label:'營舍（連隊寢室）',x:-39.3,z:-3.1,w:8.5,d:19.2,h:2.8,kind:'barracks',entry:{x:-33.9,z:-3.1}},
- {id:'office',label:'中山室／辦公大樓',x:-20,z:14.8,w:13,d:4.7,h:3.35,kind:'office',entry:{x:-20,z:11.3}},
+ {id:'office',label:'中山室',x:-20,z:14.8,w:13,d:4.7,h:3.35,kind:'office',entry:{x:-20,z:11.3}},
+ // v0.9.3: Blue-circled grass strip between central road and west loop.
+ // 0.5+ units of grass margin to both side roads; 0.1+ to north/south paths.
+ {id:'hq',label:'辦公大樓',x:-5.05,z:7.55,w:5.55,d:11.75,h:4.05,kind:'hq',facingYaw:Math.PI/2,entry:{x:-1.80,z:7.55}},
  {id:'ammo',label:'彈藥庫',x:22.4,z:20.1,w:5.1,d:5.1,h:2.45,kind:'ammo',entry:{x:22.4,z:16.8}},
  {id:'chem',label:'毒氣體驗室／核生化教室',x:23,z:3.2,w:6.7,d:7.1,h:2.8,kind:'chem',entry:{x:27.4,z:3.3}},
  {id:'store',label:'營站（福利社）',x:34,z:7.6,w:5.6,d:5.0,h:2.6,kind:'shop',entry:{x:34,z:4.0}},
@@ -62,7 +65,8 @@ export const FEATURES = [
  {id:'barracks',label:'營舍 · 折棉被',short:'營舍',x:-33.9,z:-3.1,r:2.3,color:'#578260'},
  {id:'drill',label:'大操場 · 集合／唱軍歌',short:'大操場',x:-21,z:2.9,r:4,color:'#c28b5f'},
  {id:'grenade',label:'手榴彈投擲場',short:'手榴彈',x:-21,z:-11,r:3,color:'#a47e59'},
- {id:'office',label:'中山室／辦公大樓',short:'中山室',x:-20,z:11.3,r:2.5,color:'#6c8eae'},
+ {id:'office',label:'中山室',short:'中山室',x:-20,z:11.3,r:2.5,color:'#6c8eae'},
+ {id:'hq',label:'辦公大樓',short:'辦公大樓',x:-1.80,z:7.55,r:2,color:'#6d9c8a'},
  {id:'target',label:'靶場 · 打靶訓練',short:'靶場',x:10.7,z:16.4,r:4,color:'#a87556'},
  {id:'obstacle',label:'500公尺障礙場',short:'障礙場',x:11,z:8.0,r:3,color:'#a87556'},
  {id:'single',label:'單兵戰鬥教練場',short:'單戰場',x:12,z:2.2,r:4,color:'#b58c63'},

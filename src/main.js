@@ -1,13 +1,13 @@
-import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=092';
+import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=093';
 import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=092';
 import {loadGlb} from './core/glb.js?v=060';
 import {ArmyRenderer} from './core/renderer.js?v=092';
 import {RigAnimator} from './characters/rigAnimator.js?v=084';
 import {RifleRenderer} from './battle/rifleRenderer.js?v=087';
 import {updateRangeShooter,createRangeAudio} from './battle/rangeTraining.js?v=084';
-import {CAMP,moveWithCollision} from './map/camp.js?v=092';
-import {drawMinimap} from './ui/minimap.js?v=092';
-import {initWorldMap} from './ui/worldMap.js?v=092';
+import {CAMP,moveWithCollision} from './map/camp.js?v=093';
+import {drawMinimap} from './ui/minimap.js?v=093';
+import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 

@@ -1,12 +1,13 @@
 // Army 0.7.9 — three shared Meshy buildings, nine camp locations.
 // Textured static GLBs are uploaded once per type, while each campus instance
 // has its own scale, rotation and a subtle identifying wall-color tint.
-import {BUILDINGS} from '../map/camp.js?v=091';
+import {BUILDINGS} from '../map/camp.js?v=093';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 const PLAN={
  barracks:{type:1,tint:[1,1,1]},armory:{type:1,tint:[.83,.93,.88]},
  office:{type:2,tint:[.87,.99,1.11]},canteen:{type:2,tint:[1.10,1.02,.78]},
+ hq:{type:6,tint:[1,1,1],uniform3D:true},
  ammo:{type:4,tint:[1,1,1]},guard:{type:4,tint:[1,1,1]},
  wash:{type:5,tint:[1,1,1],uniformXZ:1.14},
  store:{type:3,tint:[1.08,1.06,.80]},
@@ -18,10 +19,14 @@ export const BUILDING_MODELS=[
  {id:2,url:'./assets/buildings/building-2-community.glb?v=081'},
  {id:3,url:'./assets/buildings/building-3-small-rear-fixed.glb?v=081'},
  {id:4,url:'./assets/buildings/building-4-guardhouse.glb?v=086'},
- {id:5,url:'./assets/buildings/building-5-wash.glb?v=086'}
+ {id:5,url:'./assets/buildings/building-5-wash.glb?v=086'},
+ {id:6,url:'./assets/buildings/building-6-office.glb?v=093'}
 ];
 // Meshy output is front-facing +Z. Follow each actual doorway/interaction waypoint.
 function faceAngle(b){
+ // The open-side of the uploaded wash-station GLB faces local +Z.
+ // Lock it toward the camp interior (-X), independent of waypoint changes.
+ if(Number.isFinite(b.facingYaw))return b.facingYaw;
  const dx=b.entry.x-b.x,dz=b.entry.z-b.z;
  return Math.atan2(dx,dz);
 }
@@ -90,8 +95,16 @@ export class CampBuildings{
   const d=this.models.get(cfg.type).dimensions,yaw=faceAngle(b),turned=Math.abs(Math.sin(yaw))>.5;
   const footprintWidth=b.w*.91,footprintDepth=b.d*.91;
   let sx=(turned?footprintDepth:footprintWidth)/d.size[0];
-  const sy=b.h/d.size[1];
+  let sy=b.h/d.size[1];
   let sz=(turned?footprintWidth:footprintDepth)/d.size[2];
+  if(cfg.uniform3D){
+   // Preserve the office model's ORIGINAL X/Y/Z proportions. Long side follows
+   // the north-south lawn; use road-bounded world dimensions, NOT height stretch.
+   const safeWidth=b.w*.95,safeDepth=b.d*.95;
+   const uniform=Math.min((turned?safeDepth:safeWidth)/d.size[0],
+                          (turned?safeWidth:safeDepth)/d.size[2]);
+   sx=sy=sz=uniform;
+  }
   if(cfg.uniformXZ){
    // Stable uniform scale: rotating the open-air wash station must NOT
    // stretch the roof/sink or change its overall size.
