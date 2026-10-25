@@ -2,12 +2,12 @@ import { RigAnimator } from '../characters/rigAnimator.js';
 import { RifleRenderer } from '../battle/rifleRenderer.js';
 
 export class CombatScene {
-  constructor(renderer, glbLoader) {
+  constructor(renderer, glbLoaderOrFn) {
     this.renderer = renderer;
-    this.glbLoader = glbLoader;
+    this.glbLoaderOrFn = glbLoaderOrFn;
     this.isGameOver = false;
 
-    // 基礎數值設定
+    // 基礎戰鬥數值
     this.MAX_HP = 100;
     this.DAMAGE_PER_SHOT = 20;
     this.ATTACK_RANGE = 7.0;
@@ -18,21 +18,39 @@ export class CombatScene {
     this.rifles = [];
   }
 
+  // 統一 GLB 載入適配器
+  async _fetchGlb(path) {
+    if (typeof this.glbLoaderOrFn === 'function') {
+      try {
+        // 若為建構式
+        return await new this.glbLoaderOrFn().load(path);
+      } catch (e) {
+        // 若為一般非同步載入函式 loadGLB(path)
+        return await this.glbLoaderOrFn(path);
+      }
+    } else if (this.glbLoaderOrFn && typeof this.glbLoaderOrFn.load === 'function') {
+      return await this.glbLoaderOrFn.load(path);
+    }
+    throw new Error('無法識別的 GLB 載入器接口');
+  }
+
   async init(uiCallbacks = {}) {
     this.uiCallbacks = uiCallbacks;
 
-    // 1. 載入模型資源 (直接沿用現有路徑)
-    const cadetGlb = await this.glbLoader.load('assets/characters/cadet/cadet-green.glb');
-    const rifleGlb = await this.glbLoader.load('assets/weapons/rifle.glb');
+    // 1. 載入模型資源
+    const cadetGlb = await this._fetchGlb('assets/characters/cadet/cadet-green.glb');
+    const rifleGlb = await this._fetchGlb('assets/weapons/rifle.glb');
 
-    // 2. 註冊渲染模型 (紅軍套用紅色貼圖)
-    this.renderer.addModel('cadet_green', cadetGlb);
-    this.renderer.addModel('cadet_red', cadetGlb, {
-      textureUrl: 'assets/characters/cadet/cadet-red-texture.jpg'
-    });
-    this.renderer.addModel('rifle', rifleGlb);
+    // 2. 註冊渲染模型
+    if (this.renderer.addModel) {
+      this.renderer.addModel('cadet_green', cadetGlb);
+      this.renderer.addModel('cadet_red', cadetGlb, {
+        textureUrl: 'assets/characters/cadet/cadet-red-texture.jpg'
+      });
+      this.renderer.addModel('rifle', rifleGlb);
+    }
 
-    // 3. 檢查可用動畫列表並做 fallback
+    // 3. 動態判定可用動畫並設定 fallback
     const sampleAnimator = new RigAnimator(cadetGlb);
     const availableClips = Object.keys(sampleAnimator.clips || {});
     console.log('[Combat] 讀取到可用動畫列表:', availableClips);
@@ -44,7 +62,7 @@ export class CombatScene {
       idle: pickClip('Idle', availableClips[0] || 'Idle'),
       run: pickClip('RunFast', pickClip('Running', pickClip('Walking', 'Idle'))),
       shoot: pickClip('Shoot', pickClip('Aim', pickClip('Idle', availableClips[0]))),
-      die: pickClip('Die', pickClip('Death', null)) // 無死亡動畫時用翻轉趴地替代
+      die: pickClip('Die', pickClip('Death', null))
     };
 
     this.cadetGlb = cadetGlb;
@@ -56,13 +74,11 @@ export class CombatScene {
   reset() {
     this.isGameOver = false;
 
-    // 重設綠軍與紅軍位置
     this.fighters = [
       this.createFighter('green', 'cadet_green', [-6, 0, 0], 1),
       this.createFighter('red', 'cadet_red', [6, 0, 0], -1)
     ];
 
-    // 為雙方掛載步槍 (沿用 RifleRenderer 固定相對矩陣)
     this.rifles = this.fighters.map(f => new RifleRenderer(this.renderer, this.rifleGlb));
 
     if (this.uiCallbacks.onUpdateHP) {
@@ -84,7 +100,7 @@ export class CombatScene {
       pos: [...pos],
       rotY: lookDir > 0 ? Math.PI / 2 : -Math.PI / 2,
       animator,
-      state: 'MOVE', // MOVE, ATTACK, DEAD
+      state: 'MOVE',
       fireCooldown: 0.8 + Math.random() * 0.4,
       lastFireTime: 0,
       pitchOffset: 0
@@ -100,7 +116,6 @@ export class CombatScene {
       this.updateAI(green, red, deltaTime, totalTime);
       this.updateAI(red, green, deltaTime, totalTime);
 
-      // 判定勝負
       if (green.hp <= 0 || red.hp <= 0) {
         this.isGameOver = true;
         const winner = green.hp > 0 ? '綠軍勝利！' : '紅軍勝利！';
@@ -114,7 +129,6 @@ export class CombatScene {
       }
     }
 
-    // 更新角色動作與步槍
     this.fighters.forEach((f, idx) => {
       f.animator.update(deltaTime);
       if (this.rifles[idx]) {
@@ -131,7 +145,7 @@ export class CombatScene {
       if (this.animMapping.die) {
         self.animator.play(this.animMapping.die, false);
       } else {
-        self.pitchOffset = -Math.PI / 2; // 趴地替代
+        self.pitchOffset = -Math.PI / 2;
       }
       return;
     }
@@ -140,7 +154,6 @@ export class CombatScene {
     const dz = target.pos[2] - self.pos[2];
     const dist = Math.hypot(dx, dz);
 
-    // 面向敵軍
     self.rotY = Math.atan2(dx, dz);
 
     if (dist > this.STOP_RANGE) {
@@ -159,7 +172,6 @@ export class CombatScene {
         self.lastFireTime = now;
         self.fireCooldown = 0.9 + Math.random() * 0.4;
 
-        // 85% 機率命中扣血
         if (Math.random() < 0.85) {
           target.hp = Math.max(0, target.hp - this.DAMAGE_PER_SHOT);
         }
@@ -169,15 +181,19 @@ export class CombatScene {
 
   render() {
     this.fighters.forEach(f => {
-      this.renderer.renderCharacter({
-        modelKey: f.modelKey,
-        position: f.pos,
-        rotationY: f.rotY,
-        pitch: f.pitchOffset,
-        skeleton: f.animator.getBoneMatrices()
-      });
+      if (this.renderer.renderCharacter) {
+        this.renderer.renderCharacter({
+          modelKey: f.modelKey,
+          position: f.pos,
+          rotationY: f.rotY,
+          pitch: f.pitchOffset,
+          skeleton: f.animator.getBoneMatrices()
+        });
+      }
     });
 
-    this.rifles.forEach(r => r.render());
+    this.rifles.forEach(r => {
+      if (r.render) r.render();
+    });
   }
 }

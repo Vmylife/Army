@@ -32,6 +32,7 @@
       color: #fff;
       user-select: none;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 10;
     }
     .hp-box {
       display: flex;
@@ -60,6 +61,7 @@
       color: white;
       display: none;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 20;
     }
     button.btn-restart {
       margin-top: 18px;
@@ -99,13 +101,23 @@
   <canvas id="game-canvas"></canvas>
 
   <script type="module">
-    import { ArmyRenderer } from './src/core/renderer.js';
-    import { GlbLoader } from './src/core/glb.js';
+    import * as RendererModule from './src/core/renderer.js';
+    import * as GlbModule from './src/core/glb.js';
     import { CombatScene } from './src/combat/combatScene.js';
 
+    console.log('[System] RendererModule exports:', Object.keys(RendererModule));
+    console.log('[System] GlbModule exports:', Object.keys(GlbModule));
+
+    // 自動適配 Renderer 類別
+    const RendererClass = RendererModule.ArmyRenderer || RendererModule.Renderer || RendererModule.default;
     const canvas = document.getElementById('game-canvas');
-    const renderer = new ArmyRenderer(canvas);
-    const glbLoader = new GlbLoader();
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const renderer = new RendererClass(canvas);
+
+    // 自動適配 GLB 載入器或載入函式
+    const loadGlbFn = GlbModule.loadGLB || GlbModule.loadGlb || GlbModule.GlbLoader || GlbModule.default;
 
     const hpGreen = document.getElementById('hp-green');
     const hpRed = document.getElementById('hp-red');
@@ -113,22 +125,27 @@
     const winnerText = document.getElementById('winner-text');
     const btnRestart = document.getElementById('btn-restart');
 
-    const combat = new CombatScene(renderer, glbLoader);
+    const combat = new CombatScene(renderer, loadGlbFn);
 
-    await combat.init({
-      onUpdateHP: (green, red) => {
-        hpGreen.style.width = Math.max(0, green) + '%';
-        hpRed.style.width = Math.max(0, red) + '%';
-      },
-      onGameOver: (ended, winner) => {
-        if (ended) {
-          winnerText.innerText = winner;
-          resultBox.style.display = 'block';
-        } else {
-          resultBox.style.display = 'none';
+    try {
+      await combat.init({
+        onUpdateHP: (green, red) => {
+          hpGreen.style.width = Math.max(0, green) + '%';
+          hpRed.style.width = Math.max(0, red) + '%';
+        },
+        onGameOver: (ended, winner) => {
+          if (ended) {
+            winnerText.innerText = winner;
+            resultBox.style.display = 'block';
+          } else {
+            resultBox.style.display = 'none';
+          }
         }
-      }
-    });
+      });
+      console.log('戰鬥模組初始化成功！');
+    } catch (err) {
+      console.error('戰鬥模組初始化失敗:', err);
+    }
 
     btnRestart.addEventListener('click', () => {
       combat.reset();
@@ -141,7 +158,7 @@
 
       combat.update(dt, now / 1000);
       
-      renderer.clear();
+      if (renderer.clear) renderer.clear();
       combat.render();
 
       requestAnimationFrame(loop);
