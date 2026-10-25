@@ -102,22 +102,48 @@ export function moveWithCollision(pos,dx,dz){
 
 // Army v0.8.6: replace old primitive fence / benches / signs / pull-up bars / hurdles / flag poles
 // with uploaded Meshy assets. Trees stay slightly larger; crates and barrels stay smaller.
+// The uploaded wooden fence runs along local X (not Z). Build a continuous
+// perimeter by fitting each GLB section exactly between endpoints. The only
+// opening is 6.8 units wide at the main gate, rather than the entire south wall.
 const PERIMETER_FENCE=[];
-for(let i=0;i<PERIMETER.length;i++){
- const a=PERIMETER[i],b=PERIMETER[(i+1)%PERIMETER.length];
+const FENCE_MODEL_LENGTH=.958; // measured GLB local-X width
+const GATE_HALF_WIDTH=3.4;
+function appendFenceSpan(a,b){
  const dx=b[0]-a[0],dz=b[1]-a[1],dist=Math.hypot(dx,dz);
- if(!dist)continue;
- // Leave a clear opening at the south main gate.
- if(a[1]<-20&&b[1]<-20&&((a[0]<0&&b[0]>0)||(a[0]>0&&b[0]<0)))continue;
- const yaw=Math.atan2(dx,dz);
- const count=Math.max(1,Math.round(dist/3.2));
- for(let k=0;k<count;k++){
-  const t=(k+.5)/count;
-  PERIMETER_FENCE.push({type:'fence',x:a[0]+dx*t,z:a[1]+dz*t,scale:1.12,yaw,cull:76});
+ if(dist<.1)return;
+ const sections=Math.max(1,Math.ceil(dist/4.8));
+ const spacing=dist/sections;
+ const yaw=Math.atan2(-dz,dx); // local +X is tangent to the perimeter
+ for(let k=0;k<sections;k++){
+  const t=(k+.5)/sections;
+  PERIMETER_FENCE.push({type:'fence',x:a[0]+dx*t,z:a[1]+dz*t,
+   sx:spacing/FENCE_MODEL_LENGTH,sy:5.7,sz:5.7,yaw,cull:110});
  }
 }
-const TRAINING_HURDLES=[5.2,7.65,10.1,12.55,14.1,16.55,19.0,21.45].map(x=>({type:'hurdle',x,z:10.0,scale:1.15,yaw:0,cull:66}));
-const FITNESS_BARS=[15.9,18.8,21.7,24.6].map(x=>({type:'pullup',x,z:-17.0,scale:1.14,yaw:0,cull:64}));
+for(let i=0;i<PERIMETER.length;i++){
+ const a=PERIMETER[i],b=PERIMETER[(i+1)%PERIMETER.length];
+ if(a[1]<-20&&b[1]<-20&&Math.min(a[0],b[0])<-GATE_HALF_WIDTH&&Math.max(a[0],b[0])>GATE_HALF_WIDTH){
+  const t1=(-GATE_HALF_WIDTH-a[0])/(b[0]-a[0]);
+  const t2=(GATE_HALF_WIDTH-a[0])/(b[0]-a[0]);
+  const at=t=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+  appendFenceSpan(a,at(Math.min(t1,t2)));
+  appendFenceSpan(at(Math.max(t1,t2)),b);
+ }else appendFenceSpan(a,b);
+}
+// Reposition the existing six signboards at the right-hand side of facility
+// entrances, from the viewpoint of a soldier looking INTO that facility.
+const SIGN_FACILITIES=['barracks','office','ammo','canteen','armory','medic'];
+const ENTRANCE_SIGNS=SIGN_FACILITIES.map(id=>{
+ const b=BUILDINGS.find(x=>x.id===id);
+ const dx=b.entry.x-b.x,dz=b.entry.z-b.z;
+ const d=Math.hypot(dx,dz)||1,ox=dx/d,oz=dz/d;
+ const side=1.15,front=.58;
+ return {type:'signboard',x:b.entry.x-oz*side+ox*front,
+  z:b.entry.z+ox*side+oz*front,
+  scale:1.9,yaw:Math.atan2(ox,oz),cull:76};
+});
+const TRAINING_HURDLES=[5.2,7.65,10.1,12.55,14.1,16.55,19.0,21.45].map(x=>({type:'hurdle',x,z:10.0,scale:1.15,yaw:Math.PI/2,cull:66}));
+const FITNESS_BARS=[15.9,18.8,21.7,24.6].map(x=>({type:'pullup',x,z:-17.0,scale:2.3,yaw:0,cull:64}));
 export const PROPS = [
  // Seven existing lamp positions: keep only the uploaded lamp model, no extra posts.
  ...[[-34,8],[-12,8],[-7,-4],[5,-5],[28,-3],[31,2],[12,-20]].map(([x,z])=>
@@ -133,8 +159,7 @@ export const PROPS = [
  // New uploaded replacement props.
  ...[[-32,-16,Math.PI/2],[-1,8,0],[27,-19,0],[33,13,0]].map(([x,z,yaw])=>
    ({type:'bench',x,z,scale:1.10,yaw,cull:60})),
- ...[[-4,18,0],[21,8,0],[29,8,0],[28,-18,0],[-10,-18,0],[-38,10,0]].map(([x,z,yaw])=>
-   ({type:'signboard',x,z,scale:1.05,yaw,cull:60})),
+ ...ENTRANCE_SIGNS,
  ...TRAINING_HURDLES,
  ...FITNESS_BARS,
  {type:'flagpole',x:-18.6,z:7.0,scale:1.20,yaw:0,cull:76},

@@ -1,11 +1,11 @@
-import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=086';
-import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=086';
+import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=087';
+import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=087';
 import {loadGlb} from './core/glb.js?v=060';
-import {ArmyRenderer} from './core/renderer.js?v=086';
+import {ArmyRenderer} from './core/renderer.js?v=087';
 import {RigAnimator} from './characters/rigAnimator.js?v=084';
-import {RifleRenderer} from './battle/rifleRenderer.js?v=086';
+import {RifleRenderer} from './battle/rifleRenderer.js?v=087';
 import {updateRangeShooter,createRangeAudio} from './battle/rangeTraining.js?v=084';
-import {CAMP,moveWithCollision} from './map/camp.js?v=086';
+import {CAMP,moveWithCollision} from './map/camp.js?v=087';
 import {drawMinimap} from './ui/minimap.js?v=086';
 import {initWorldMap} from './ui/worldMap.js?v=086';
 import {setupInput} from './ui/input.js?v=062';
@@ -56,7 +56,6 @@ function createCampNPCs(glb){
 function updateCampNPCs(npcs,dt,now,playerPos){
  for(let i=0;i<npcs.length;i++){
   const n=npcs[i],activity=n.home.job;
-  const d=Math.hypot(n.pos.x-playerPos.x,n.pos.z-playerPos.z);
   if(activity==='shoot'){
    // Keep aim blend and shot timing smooth. Never throttle the firing cycle.
    updateRangeShooter(n,now);
@@ -99,13 +98,8 @@ function updateCampNPCs(npcs,dt,now,playerPos){
    if(n.anim.clip!==clip)n.anim.setClip(clip);
    n.anim.speed=n.state==='move'?(activity==='march'?1.15:1):1;
   }
-  // Off-screen/distant characters do not render; save bone CPU time while
-  // keeping their world position and decisions synchronized in real time.
-  if(d<28.5){
-   if(activity==='shoot'||n.state==='move'||n.anim.transition>0||n.anim.clip!=='Idle'){
-    n.anim.evaluate(dt);
-   }
-  }
+  // World movement/decisions continue for EVERY NPC. Bone animation is
+  // evaluated on visible NPCs in the render pass, without a distance cutoff.
  }
 }
 
@@ -194,7 +188,13 @@ async function boot(){
     for(const npc of npcs){
       const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
       if(npc.shotPending){npc.shotPending=false;playRangeShot(distance)}
-      if(distance<28){renderer.drawActor('recruit',npc);if(npc.home.job==='shoot')rifleRenderer.draw(renderer.vp,npc,now)}
+      // Frustum-only culling: even faraway soldiers remain on screen.
+      // Offscreen soldiers keep moving logically, but cost no bone rendering.
+      if(renderer.isActorVisible(npc.pos)){
+       npc.anim.evaluate(dt);
+       renderer.drawActor('recruit',npc);
+       if(npc.home.job==='shoot')rifleRenderer.draw(renderer.vp,npc,now);
+      }
     }
 
     mapFacing=Math.PI-player.angle+mapYaw;

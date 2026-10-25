@@ -72,6 +72,18 @@ export class ArmyRenderer{
  this.vp=mul(perspective(portrait?Math.PI/3.7:Math.PI/4.15,w/h,.1,150),lookAt([ex,ey,ez],[this.cameraTarget.x,.65,this.cameraTarget.z]));
  gl.useProgram(this.pFlat);gl.uniformMatrix4fv(this.flatVP,false,this.vp);gl.bindVertexArray(this.flatVAO);gl.drawArrays(gl.TRIANGLES,0,this.environment.count);
  }
+ // Cull only when an actor is outside the actual camera view.
+ // A near/far 28m radius would incorrectly make NPCs pop out in the distance.
+ isActorVisible(pos){
+  const m=this.vp,x=pos.x,y=.9,z=pos.z;
+  const w=m[3]*x+m[7]*y+m[11]*z+m[15];
+  if(w<=.01)return false;
+  const sx=m[0]*x+m[4]*y+m[8]*z+m[12];
+  const sy=m[1]*x+m[5]*y+m[9]*z+m[13];
+  const sz=m[2]*x+m[6]*y+m[10]*z+m[14];
+  // Generous padding covers the whole chibi, not just its pelvis.
+  return Math.abs(sx)<w*1.20+.5 && Math.abs(sy)<w*1.22+.6 && sz>=-w-.6 && sz<=w+.6;
+ }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
  gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,groundLift(a,actor),actor.pos.z),rotateY(actor.angle)));
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
