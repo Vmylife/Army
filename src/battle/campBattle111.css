@@ -1,0 +1,21 @@
+/* v0.11.1 - overlays only. The original game CSS, camera and input remain unchanged. */
+.battle-modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 18px}
+.battle-modes button{padding:13px 7px;background:#e7ecdd;border:2px solid #c0d0bd;border-radius:12px;color:#294937;font-weight:800;font-size:15px;line-height:1.5;cursor:pointer;touch-action:manipulation}
+.battle-modes button.chosen{background:#d1e1ce;border-color:#326747;box-shadow:inset 0 0 0 1px #326747}
+.battle-modes small{display:block;color:#56705b;font-size:11px;font-weight:600}
+.battle-back{display:inline-block;margin-top:12px;color:#416451;font-size:13px}
+.battle-hud[hidden],.battle-result[hidden]{display:none!important}
+.battle-hud{position:fixed;right:calc(env(safe-area-inset-right) + 12px);top:calc(env(safe-area-inset-top) + 12px);z-index:24;width:min(185px,45vw);padding:10px 12px;background:#f9f6e9e9;color:#214233;border:1px solid #c6d4bb;border-radius:13px;box-shadow:0 5px 16px #1e332432;font:12px system-ui,'Noto Sans TC',sans-serif;pointer-events:none}
+.battle-hud__top{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;white-space:nowrap}
+.battle-hud__top strong{font-size:12px}
+.battle-hud__bar{height:9px;background:#d2d5c8;border-radius:8px;overflow:hidden;margin:8px 0 4px}
+#battleHpBar{height:100%;width:100%;background:#60966a;transition:width .2s}
+.battle-hud__bottom{display:flex;justify-content:space-between;color:#4f6752;font-size:10px}
+.battle-hud__note{color:#6b745d;margin-top:6px;font-size:10px}
+.battle-result{position:fixed;inset:0;display:grid;place-items:center;background:#20332990;z-index:180;padding:22px;font-family:system-ui,'Noto Sans TC',sans-serif}
+.battle-result__panel{width:min(100%,350px);box-sizing:border-box;background:#faf8e9;border-radius:19px;padding:27px 24px;text-align:center;color:#253d2f;box-shadow:0 12px 40px #1b2b2080}
+.battle-result__panel h2{margin:0 0 13px;font-size:24px}
+.battle-result__panel p{white-space:pre-line;line-height:1.7;font-size:14px}
+.battle-result__panel button{display:block;width:100%;background:#355947;border:0;border-radius:11px;color:white;font-weight:bold;font-size:17px;padding:13px;margin:19px 0 10px;cursor:pointer}
+.battle-result__panel a{font-size:13px;color:#496552}
+@media(max-width:420px){.battle-hud{width:166px;padding:9px 10px}.battle-hud__top{font-size:10px}}

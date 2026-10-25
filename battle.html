@@ -1,48 +1,60 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="theme-color" content="#162a20"/>
-<title>國軍模擬器｜戰鬥實驗場 v0.11.0</title>
-<link rel="stylesheet" href="./src/combat/battle.css?v=0110"/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#b7c9b2">
+<title>國軍模擬器｜軍營保衛戰 v0.11.1</title>
+<link rel="stylesheet" href="./src/battle/campBattle111.css?v=111">
+<link rel="stylesheet" href="./src/ui/playtest.css?v=077">
+<link rel="stylesheet" href="./src/ui/home105.css?v=105">
 </head>
 <body>
-<div id="stage">
-  <canvas id="battle3d" aria-label="3D 戰鬥場景"></canvas>
-  <canvas id="effects" aria-hidden="true"></canvas>
-  <div id="hud" hidden>
-    <div class="hud-row">
-      <div class="stat"><span class="quiet">主角生命</span><div class="health"><i id="hpfill"></i></div><b id="hptext">200 / 200</b></div>
-      <div class="stat"><span class="quiet">擊殺</span><b id="kills">0</b></div>
-      <div class="stat"><span class="quiet">波次</span><b id="wave">1</b></div>
-      <div class="stat"><span class="quiet">存活</span><b id="timer">0:00</b></div>
-    </div>
-    <div class="hud-tools">
-      <button id="speed" type="button" aria-label="調整戰鬥速度">速度 1×</button>
-      <button id="zoomOut" type="button" aria-label="鏡頭拉遠">－</button>
-      <button id="zoomIn" type="button" aria-label="鏡頭拉近">＋</button>
-      <button id="sound" type="button" aria-label="切換音效">音效 關</button>
-    </div>
-    <p id="modeTag">普通士兵</p>
+<canvas id="world" aria-label="國軍模擬器 3D 軍營"></canvas>
+<button id="minimap" type="button" aria-label="開啟軍營保衛戰地圖" title="開啟軍營保衛戰地圖"><canvas id="miniCanvas" width="224" height="224" aria-hidden="true"></canvas></button>
+<section id="worldMap" class="world-map" role="dialog" aria-label="軍營保衛戰地圖" aria-modal="true" hidden>
+  <div class="world-map-panel">
+    <header class="world-map-header"><div><strong>🗺️ 軍營保衛戰地圖</strong><small>紅軍從營舍側與哨口側進攻 · 藍色箭頭為主角面向</small></div><button id="closeWorldMap" type="button" aria-label="關閉大地圖">✕</button></header>
+    <div class="world-map-body"><div class="map-canvas-holder"><canvas id="worldMapCanvas" aria-label="完整軍營地圖，顯示所有地點和自身方向"></canvas></div></div>
   </div>
-  <div id="menu" class="scrim">
-    <section class="panel intro">
-      <span class="eyebrow">ARMY · EXPERIMENT 0110</span>
-      <h1>國軍模擬器<br/><strong>戰鬥實驗場</strong></h1>
-      <p>一個綠色阿兵哥，對上源源不絕的紅色敵軍。<br/>自動跑位、自動射擊，看看你的小兵能撐多久。</p>
-      <div class="choices" role="group" aria-label="測試士兵能力">
-        <button class="choice active" data-mode="normal" aria-pressed="true"><b>普通士兵</b><small>適合測試基本戰鬥</small></button>
-        <button class="choice" data-mode="elite" aria-pressed="false"><b>超強士兵</b><small>火力全開，測試清場爽感</small></button>
-      </div>
-      <button class="primary" id="start" type="button">開始觀戰</button>
-      <p class="hint">戰場獨立測試，不會更改你的軍營。<br/>手機可直接開啟，建議先用普通速度測試。</p>
-      <a class="return" href="./index.html">返回軍營首頁</a>
-    </section>
+</section>
+<div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
+<div id="notice" role="status" hidden></div>
+<section id="battleHUD" class="battle-hud" aria-label="戰鬥資訊" hidden>
+ <div class="battle-hud__top"><strong id="battleMode">普通士兵</strong><span>擊殺 <b id="battleKills">0</b></span><span>敵軍 <b id="battleEnemies">0</b></span></div>
+ <div class="battle-hud__bar"><div id="battleHpBar"></div></div>
+ <div class="battle-hud__bottom"><span id="battleHp">生命 160 / 160</span><span id="battleTimer">0:00</span></div>
+ <div class="battle-hud__note" id="battleNotice">敵軍正從兩側入侵…</div>
+</section>
+<section id="battleResult" class="battle-result" role="dialog" aria-modal="true" hidden>
+ <div class="battle-result__panel"><h2 id="battleEndTitle">戰鬥結束</h2><p id="battleEndText"></p>
+ <button type="button" id="battleAgain">重新挑戰</button><a href="./index.html">返回軍營</a></div>
+</section>
+<section class="army-home" id="armyHome" aria-label="國軍模擬器首頁">
+  <div class="army-home__panel">
+    <div class="army-home__emblem" aria-hidden="true">🪖</div>
+    <h1>軍營保衛戰</h1>
+    <p class="army-home__tagline">同一座軍營 · 自己控制移動 · 靠近敵軍自動射擊</p>
+    <div class="battle-modes" role="group" aria-label="士兵測試能力">
+      <button type="button" data-mode="normal" aria-pressed="true" class="chosen">普通士兵<small>慢速移動 · 慢射速 · 短射程</small></button>
+      <button type="button" data-mode="elite" aria-pressed="false">超級士兵<small>快速移動 · 高射速 · 長射程</small></button>
+    </div>
+    <button id="armyStart" class="army-home__start" type="button">開始戰鬥</button>
+    <div id="armyLoading" class="army-home__load" role="status" aria-live="polite" hidden>
+      <p class="army-home__message" id="armyMessage">準備載入…</p>
+      <div class="army-home__progress" role="progressbar" aria-label="軍營載入進度"><div id="armyBar" class="army-home__bar"></div></div>
+      <div id="armyCount" class="army-home__count">0%</div>
+    </div>
+    <div class="army-home__foot">使用原版軍營操作；左手搖桿移動、右側拖曳視角、雙指縮放。</div>
+    <a class="battle-back" href="./index.html">返回原本軍營</a>
   </div>
-  <div id="loading" class="scrim" hidden><section class="panel waiting"><span class="eyebrow">LOADING</span><h2>士兵正在集結…</h2><p id="loadMsg">建立戰場</p><div class="progress"><i id="loadBar"></i></div><b id="loadPercent">0%</b><p class="hint">第一次開啟需要下載既有士兵模型和武器。</p></section></div>
-  <div id="end" class="scrim" hidden><section class="panel"><span class="eyebrow">BATTLE REPORT</span><h2 id="endTitle">戰鬥結束</h2><p id="endSummary"></p><div class="end-actions"><button class="primary" id="again">再戰一次</button><button id="backMenu">回到選擇畫面</button></div></section></div>
-  <div id="fatal" class="scrim" hidden><section class="panel"><h2>載入失敗</h2><p id="errorText"></p><button class="primary" id="retry">重新載入</button></section></div>
-</div>
-<script type="module" src="./src/combat/main.js?v=0110"></script>
-</body></html>
+</section>
+<div id="fatal" role="alert" hidden><strong>遊戲無法啟動</strong><p id="errorText"></p><button type="button" id="retry">重新載入</button></div>
+<div id="debug" hidden></div>
+<!-- Army v0.11.1: original camp renderer/input + battle-only missing west/south perimeter fencing. -->
+<script type="importmap">
+{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=103","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=104"}}
+</script>
+<script type="module" src="./src/battle/campBattleBoot111.js?v=111"></script>
+</body>
+</html>
