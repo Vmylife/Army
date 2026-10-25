@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#b7c9b2">
 <title>國軍模擬器｜Army</title>
 <link rel="stylesheet" href="./src/ui/playtest.css?v=077">
+<link rel="stylesheet" href="./src/ui/home105.css?v=105">
 </head>
 <body>
 <canvas id="world" aria-label="國軍模擬器 3D 軍營"></canvas>
@@ -17,13 +18,27 @@
   </div>
 </section>
 <div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
-<div id="notice" role="status">載入阿兵哥…</div>
+<div id="notice" role="status" hidden></div>
+<section class="army-home" id="armyHome" aria-label="國軍模擬器首頁">
+  <div class="army-home__panel">
+    <div class="army-home__emblem" aria-hidden="true">🪖</div>
+    <h1>國軍模擬器</h1>
+    <p class="army-home__tagline">新兵訓練營 · 六分鐘軍旅生活</p>
+    <button id="armyStart" class="army-home__start" type="button">開始遊戲</button>
+    <div id="armyLoading" class="army-home__load" role="status" aria-live="polite" hidden>
+      <p class="army-home__message" id="armyMessage">準備載入…</p>
+      <div class="army-home__progress" role="progressbar" aria-label="軍營載入進度"><div id="armyBar" class="army-home__bar"></div></div>
+      <div id="armyCount" class="army-home__count">0%</div>
+    </div>
+    <div class="army-home__foot">地圖及模型載入完成後才會進入軍營</div>
+  </div>
+</section>
 <div id="fatal" role="alert" hidden><strong>遊戲無法啟動</strong><p id="errorText"></p><button type="button" id="retry">重新載入</button></div>
 <div id="debug" hidden></div>
-<!-- Army v0.10.4: fixes missing ROAD_EDGE_SHAPES map export, retains v0.10.3 layout. -->
+<!-- Army v0.10.5: homepage + full preload + precise prop collision. -->
 <script type="importmap">
 {"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=103","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=104"}}
 </script>
-<script type="module" src="./src/bootstrap103.js?v=103"></script>
+<script type="module" src="./src/bootstrap105.js?v=105"></script>
 </body>
 </html>
