@@ -1,0 +1,9 @@
+Army v0.10.4 修復啟動畫面卡住
+
+原因：v0.10.3 重新產生的道路網格沒有匯出 ROAD_EDGE_SHAPES，導致 2D 地圖程式的 ES module 載入失敗。
+
+修正：新增完整 ROAD_EDGE_SHAPES 給迷你地圖／完整地圖使用，更新 index.html 匯入路徑與版本號避免快取舊模組。
+
+保留 v0.10.3 既有建築、道具擺位、道路網格與取消靜態陰影等成果。
+
+將 index.html 與 src/map/roadMesh104.js 按照原目錄上傳 GitHub，不須上傳大型模型。
