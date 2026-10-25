@@ -10,7 +10,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #3e4a3d;
+      background: #2b332b;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #game-canvas {
@@ -26,7 +26,7 @@
       display: flex;
       gap: 24px;
       align-items: center;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.7);
       padding: 12px 28px;
       border-radius: 10px;
       color: #fff;
@@ -43,7 +43,7 @@
     .bar {
       width: 100%;
       height: 14px;
-      background: #2b2b2b;
+      background: #222;
       border-radius: 7px;
       overflow: hidden;
     }
@@ -54,13 +54,13 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.88);
       padding: 30px 60px;
       border-radius: 14px;
       text-align: center;
       color: white;
       display: none;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
       z-index: 20;
     }
     button.btn-restart {
@@ -110,13 +110,10 @@
     canvas.height = window.innerHeight;
 
     const renderer = new RendererClass(canvas);
-    console.log('[System] Renderer 實例方法清單:', Object.getOwnPropertyNames(Object.getPrototypeOf(renderer)));
 
+    // 依據真實 API 設定相機
     if (renderer.setCamera) {
-      renderer.setCamera([0, 4, 10], [0, 0, 0]);
-    } else if (renderer.camera) {
-      if (renderer.camera.position) renderer.camera.position.set(0, 4, 10);
-      if (renderer.camera.target) renderer.camera.target.set(0, 0, 0);
+      renderer.setCamera([0, 5, 9], [0, 1, 0]);
     }
 
     const loadGlbFn = GlbModule.loadGLB || GlbModule.loadGlb || GlbModule.GlbLoader || GlbModule.default;
@@ -158,12 +155,12 @@
 
       combat.update(dt, totalTime);
       
-      if (renderer.beginFrame) renderer.beginFrame();
-      if (renderer.clear) renderer.clear();
+      // 根據真實 API 清單：呼叫 startFrame()
+      if (renderer.startFrame) {
+        renderer.startFrame();
+      }
       
       combat.render();
-      
-      if (renderer.endFrame) renderer.endFrame();
 
       requestAnimationFrame(loop);
     }

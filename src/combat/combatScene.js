@@ -5,7 +5,7 @@ export class CombatScene {
   constructor(renderer, loadGlbFn) {
     this.renderer = renderer;
     this.loadGlbFn = loadGlbFn;
-    this.gl = renderer.gl || renderer.ctx || renderer;
+    this.gl = renderer.gl || renderer.ctx;
     this.isGameOver = false;
 
     // 戰鬥參數
@@ -32,35 +32,40 @@ export class CombatScene {
   async init(uiCallbacks = {}) {
     this.uiCallbacks = uiCallbacks;
 
-    // 1. 載入士兵模型
+    // 1. 載入士兵 GLB
     this.cadetGlb = await this._fetchGlb('assets/characters/cadet/cadet-green.glb');
+    console.log('[Combat] 載入的 cadetGlb 物件結構:', this.cadetGlb);
 
     // 2. 註冊綠軍與紅軍到 ArmyRenderer
+    // 解決 gltf.read is not a function: 確保傳入擁有 read 方法的物件
     if (this.renderer.addModel) {
-      this.renderer.addModel('cadet_green', this.cadetGlb);
       try {
-        // 淺複製/JSON結構拷貝避免 bufferView 衝突
-        const redGlb = JSON.parse(JSON.stringify(this.cadetGlb));
-        if (this.cadetGlb.binaryChunk) redGlb.binaryChunk = this.cadetGlb.binaryChunk;
-        this.renderer.addModel('cadet_red', redGlb, {
-          textureUrl: 'assets/characters/cadet/cadet-red-texture.jpg'
-        });
-      } catch (e) {
-        console.warn('紅軍獨立模型註冊失敗，共用 green 貼圖');
+        // 如果 cadetGlb 本身沒有 read，但有 gltf / model / raw 屬性
+        const modelTarget = this.cadetGlb.read ? this.cadetGlb : (this.cadetGlb.gltf || this.cadetGlb);
+        
+        await this.renderer.addModel('cadet_green', modelTarget);
+        
+        // 紅軍註冊
+        try {
+          await this.renderer.addModel('cadet_red', modelTarget, {
+            textureUrl: 'assets/characters/cadet/cadet-red-texture.jpg'
+          });
+        } catch (e) {
+          console.warn('[Combat] 紅軍註冊退回共用綠軍:', e);
+        }
+      } catch (err) {
+        console.error('[Combat] addModel 失敗:', err);
       }
     }
 
     // 3. 嘗試載入步槍
     try {
       this.rifleGlb = await this._fetchGlb('assets/weapons/rifle.glb');
-      if (this.renderer.addModel && this.rifleGlb) {
-        this.renderer.addModel('rifle', this.rifleGlb);
-      }
     } catch (e) {
-      console.warn('步槍載入略過:', e);
+      console.warn('[Combat] 步槍載入略過:', e);
     }
 
-    // 4. 對應真實的 16 個動畫
+    // 4. 動畫映射
     this.animMapping = {
       idle: 'Idle',
       run: 'Running',
@@ -74,18 +79,18 @@ export class CombatScene {
   reset() {
     this.isGameOver = false;
 
-    const redKey = (this.renderer.models && this.renderer.models.has && this.renderer.models.has('cadet_red'))
-      ? 'cadet_red'
-      : 'cadet_green';
-
+    // 取得可用的模型 key
     this.fighters = [
       this.createFighter('green', 'cadet_green', [-4, 0, 0], 1),
-      this.createFighter('red', redKey, [4, 0, 0], -1)
+      this.createFighter('red', 'cadet_red', [4, 0, 0], -1)
     ];
 
     try {
       if (this.rifleGlb && typeof RifleRenderer === 'function') {
-        this.rifles = this.fighters.map(f => new RifleRenderer(this.gl, this.rifleGlb));
+        const glCtx = this.gl || this.renderer.gl;
+        if (glCtx) {
+          this.rifles = this.fighters.map(f => new RifleRenderer(glCtx, this.rifleGlb));
+        }
       }
     } catch (e) {
       this.rifles = [];
@@ -186,17 +191,21 @@ export class CombatScene {
     this.fighters.forEach(f => {
       const bones = f.animator.boneMatrices || f.animator.matrices || (f.animator.getMatrices && f.animator.getMatrices());
 
-      if (this.renderer.drawCharacter) {
-        this.renderer.drawCharacter(f.modelKey, f.pos, f.rotY, bones);
-      } else if (this.renderer.renderCharacter) {
-        this.renderer.renderCharacter({
-          modelKey: f.modelKey,
-          position: f.pos,
-          rotationY: f.rotY,
-          skeleton: bones
-        });
-      } else if (this.renderer.drawModel) {
-        this.renderer.drawModel(f.modelKey, f.pos, f.rotY);
+      // 根據 Console 真實方法清單：使用 drawActor
+      if (this.renderer.drawActor) {
+        try {
+          this.renderer.drawActor(f.modelKey, f.pos, f.rotY, bones);
+        } catch (e) {
+          // 若 drawActor 參數為物件型式
+          try {
+            this.renderer.drawActor({
+              model: f.modelKey,
+              position: f.pos,
+              rotation: f.rotY,
+              bones: bones
+            });
+          } catch (e2) {}
+        }
       }
     });
 
