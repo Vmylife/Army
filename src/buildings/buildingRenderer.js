@@ -1,14 +1,14 @@
 // Army 0.7.9 — three shared Meshy buildings, nine camp locations.
 // Textured static GLBs are uploaded once per type, while each campus instance
 // has its own scale, rotation and a subtle identifying wall-color tint.
-import {BUILDINGS} from '../map/camp.js?v=087';
+import {BUILDINGS} from '../map/camp.js?v=089';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 const PLAN={
  barracks:{type:1,tint:[1,1,1]},armory:{type:1,tint:[.83,.93,.88]},
  office:{type:2,tint:[.87,.99,1.11]},canteen:{type:2,tint:[1.10,1.02,.78]},
  ammo:{type:4,tint:[1,1,1]},guard:{type:4,tint:[1,1,1]},
- wash:{type:5,tint:[1,1,1]},
+ wash:{type:5,tint:[1,1,1],uniformXZ:1.14},
  store:{type:3,tint:[1.08,1.06,.80]},
  medic:{type:3,tint:[1.10,.97,.97]},visitor:{type:3,tint:[.88,1.04,1.14]},
  chem:{type:3,tint:[.82,1.11,1.03]}
@@ -89,14 +89,20 @@ export class CampBuildings{
  buildInstances(){this.instances=[];for(const b of BUILDINGS){const cfg=PLAN[b.id];if(!cfg||!this.models.has(cfg.type))continue;
   const d=this.models.get(cfg.type).dimensions,yaw=faceAngle(b),turned=Math.abs(Math.sin(yaw))>.5;
   const footprintWidth=b.w*.91,footprintDepth=b.d*.91;
-  const sx=(turned?footprintDepth:footprintWidth)/d.size[0];
+  let sx=(turned?footprintDepth:footprintWidth)/d.size[0];
   const sy=b.h/d.size[1];
-  const sz=(turned?footprintWidth:footprintDepth)/d.size[2];
+  let sz=(turned?footprintWidth:footprintDepth)/d.size[2];
+  if(cfg.uniformXZ){
+   const fitX=(turned?footprintDepth:footprintWidth)/d.size[0];
+   const fitZ=(turned?footprintWidth:footprintDepth)/d.size[2];
+   const uniform=Math.min(fitX,fitZ)*cfg.uniformXZ;
+   sx=uniform;sz=uniform;
+  }
   const model=mul(translation(b.x-d.mid[0]*sx*Math.cos(yaw)-d.mid[2]*sz*Math.sin(yaw),.025-d.min[1]*sy,b.z+d.mid[0]*sx*Math.sin(yaw)-d.mid[2]*sz*Math.cos(yaw)),mul(rotateY(yaw),matScale(sx,sy,sz)));
   this.instances.push({type:cfg.type,model,tint:new Float32Array(cfg.tint),x:b.x,z:b.z});
  }}
  draw(vp,target){const gl=this.gl;gl.useProgram(this.shader);gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform1i(this.sampler,0);
-  for(const i of this.instances){if(target&&Math.hypot(target.x-i.x,target.z-i.z)>70)continue;
+  for(const i of this.instances){
    const m=this.models.get(i.type);if(!m)continue;gl.uniformMatrix4fv(this.model,false,i.model);gl.uniform3fv(this.tint,i.tint);
    for(const part of m.meshes){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.materials[part.material]||m.materials[0]);gl.bindVertexArray(part.vao);gl.drawElements(gl.TRIANGLES,part.count,part.indexType,0)}
   }
