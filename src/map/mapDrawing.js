@@ -1,6 +1,6 @@
 // Army v0.7.6 — shared world geometry, independently chosen map orientation.
 // Minimap is camera-aligned; full map uses a constant heading based on screenshot.
-import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=090';
+import {CAMP,PERIMETER,ZONES,BUILDINGS,FEATURES} from './camp.js?v=091';
 import {ROAD_EDGE_SHAPES,ROAD_FILL_SHAPES} from './roadMesh.js?v=071';
 const PAL={barracks:'#88b38e',office:'#85b1cf',ammo:'#d29b96',chem:'#93b7b1',shop:'#c4bc69',canteen:'#e6c16c',wash:'#a5d6d8',medic:'#f5d3b3',armory:'#dec17d',visitor:'#a6c5e0',guard:'#afc3a5'};
 function playerIcon(ctx,x,y,heading,scale=1){
@@ -66,7 +66,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
  for(let k=0;k<5;k++){
   const y=py(8.1+k*.71);ctx.beginPath();ctx.moveTo(px(1),y);ctx.lineTo(px(22.4),y);ctx.strokeStyle='#fff9dd';ctx.lineWidth=Math.max(.7,scale*.06);ctx.stroke();
  }
- rect(-13.6,-16.1,4.4,2.5,'#ae683c'); // command stand
+ rect(-22.0,-14.8,4.9,2.8,'#ae683c'); // command stand
  // Distinct buildings, outlines, simple rooftop details.
  for(const b of BUILDINGS){const color=PAL[b.kind]||'#789e82';rect(b.x,b.z,b.w,b.d,color,'#4c6254');
   if(b.kind==='medic'&&!mini){ctx.strokeStyle='#c84845';ctx.lineWidth=Math.max(2,scale*.5);ctx.beginPath();ctx.moveTo(px(b.x)-6,py(b.z));ctx.lineTo(px(b.x)+6,py(b.z));ctx.moveTo(px(b.x),py(b.z)-6);ctx.lineTo(px(b.x),py(b.z)+6);ctx.stroke()}
@@ -104,7 +104,7 @@ export function drawCampMap(ctx,{width,height,player,enemy=null,heading=0,mini=f
   ctx.restore();
  }
  if(!mini){
-  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['彈藥庫',22.4,20.1],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',44,0.2],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2],['哨口',3.7,-19.5]];
+  const names=[['營舍',-39,-3],['大操場',-21,1],['投擲場',-21,-11],['中山室',-20,15],['靶場',11,20],['彈藥庫',22.4,20.1],['500公尺障礙場',12,10],['單戰場',12,4],['連隊集合場',15,-8],['毒氣室',23,3],['營站',34,7.6],['餐廳',37,-2.6],['洗碗區',43.2,3.0],['醫務所',31.5,-12.3],['軍械室',7,-16.2],['會客室',-5,-15.8],['體能場',20,-16.2],['哨口',3.7,-19.5]];
   for(const [name,x,z] of names){const [sx,sy]=projected(x,z);const size=Math.max(8,Math.min(12,scale*1.42));ctx.font=`700 ${size}px system-ui,"PingFang TC",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=2.9;ctx.strokeStyle='#fff9e9';ctx.strokeText(name,sx,sy);ctx.fillStyle='#344c3b';ctx.fillText(name,sx,sy)}
   // Compass shows actual geographical north after map alignment.
   const nx=-Math.sin(yaw),ny=Math.cos(yaw),cx=width-29,cy=27;
