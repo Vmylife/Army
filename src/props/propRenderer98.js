@@ -1,4 +1,4 @@
-// Army v0.9.8 — adds custom basketball hoop and grenade crate prop models.
+// Army v0.9.9 — adds custom basketball hoop and grenade crate prop models.
 import {PROPS} from '../map/camp.js?v=092';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
@@ -17,8 +17,8 @@ export const PROP_MODELS=[
  {id:'flagpole',url:'./assets/props/flagpole.glb?v=086'},
  {id:'podium',url:'./assets/props/podium.glb?v=088'},
  {id:'fence',url:'./assets/props/fence.glb?v=086'},
- {id:'basketballHoop',url:'./assets/props/basketball-hoop.glb?v=098'},
- {id:'grenadeCrate',url:'./assets/props/grenade-crate.glb?v=098'}
+ {id:'basketballHoop',url:'./assets/props/basketball-hoop.glb?v=099'},
+ {id:'grenadeCrate',url:'./assets/props/grenade-crate.glb?v=099'}
 ];
 
 const VS=`#version 300 es
