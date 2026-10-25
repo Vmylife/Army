@@ -10,7 +10,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #1e1e1e;
+      background: #3e4a3d;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #game-canvas {
@@ -73,7 +73,6 @@
       cursor: pointer;
       font-size: 16px;
       font-weight: bold;
-      transition: background 0.2s;
     }
     button.btn-restart:hover {
       background: #1976d2;
@@ -105,18 +104,21 @@
     import * as GlbModule from './src/core/glb.js';
     import { CombatScene } from './src/combat/combatScene.js';
 
-    console.log('[System] RendererModule exports:', Object.keys(RendererModule));
-    console.log('[System] GlbModule exports:', Object.keys(GlbModule));
-
-    // 自動適配 Renderer 類別
     const RendererClass = RendererModule.ArmyRenderer || RendererModule.Renderer || RendererModule.default;
     const canvas = document.getElementById('game-canvas');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     const renderer = new RendererClass(canvas);
+    console.log('[System] Renderer 實例方法清單:', Object.getOwnPropertyNames(Object.getPrototypeOf(renderer)));
 
-    // 自動適配 GLB 載入器或載入函式
+    if (renderer.setCamera) {
+      renderer.setCamera([0, 4, 10], [0, 0, 0]);
+    } else if (renderer.camera) {
+      if (renderer.camera.position) renderer.camera.position.set(0, 4, 10);
+      if (renderer.camera.target) renderer.camera.target.set(0, 0, 0);
+    }
+
     const loadGlbFn = GlbModule.loadGLB || GlbModule.loadGlb || GlbModule.GlbLoader || GlbModule.default;
 
     const hpGreen = document.getElementById('hp-green');
@@ -127,39 +129,41 @@
 
     const combat = new CombatScene(renderer, loadGlbFn);
 
-    try {
-      await combat.init({
-        onUpdateHP: (green, red) => {
-          hpGreen.style.width = Math.max(0, green) + '%';
-          hpRed.style.width = Math.max(0, red) + '%';
-        },
-        onGameOver: (ended, winner) => {
-          if (ended) {
-            winnerText.innerText = winner;
-            resultBox.style.display = 'block';
-          } else {
-            resultBox.style.display = 'none';
-          }
+    await combat.init({
+      onUpdateHP: (green, red) => {
+        hpGreen.style.width = Math.max(0, green) + '%';
+        hpRed.style.width = Math.max(0, red) + '%';
+      },
+      onGameOver: (ended, winner) => {
+        if (ended) {
+          winnerText.innerText = winner;
+          resultBox.style.display = 'block';
+        } else {
+          resultBox.style.display = 'none';
         }
-      });
-      console.log('戰鬥模組初始化成功！');
-    } catch (err) {
-      console.error('戰鬥模組初始化失敗:', err);
-    }
+      }
+    });
 
     btnRestart.addEventListener('click', () => {
       combat.reset();
     });
 
-    let lastTime = performance.now();
+    let startTime = performance.now();
+    let lastTime = startTime;
+
     function loop(now) {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
+      const totalTime = (now - startTime) / 1000;
       lastTime = now;
 
-      combat.update(dt, now / 1000);
+      combat.update(dt, totalTime);
       
+      if (renderer.beginFrame) renderer.beginFrame();
       if (renderer.clear) renderer.clear();
+      
       combat.render();
+      
+      if (renderer.endFrame) renderer.endFrame();
 
       requestAnimationFrame(loop);
     }
