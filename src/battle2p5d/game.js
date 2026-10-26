@@ -10,6 +10,27 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const hypot = Math.hypot;
 const formatTime = t => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
+// v0.13.3: actual character artwork, cropped transparent PNGs shipped inside this ZIP.
+const SPRITE_URLS = {
+  heroLow: './src/battle2p5d/assets/hero_low.png?v=0133',
+  heroAim: './src/battle2p5d/assets/hero_aim.png?v=0133',
+  enemyAim: './src/battle2p5d/assets/enemy_aim.png?v=0133',
+};
+const SPRITES = {};
+let spritesLoading = null;
+function ensureSprites(){
+  if(!spritesLoading){
+    spritesLoading = Promise.all(Object.entries(SPRITE_URLS).map(([name,url])=>new Promise((resolve,reject)=>{
+      const im = new Image();
+      im.onload = ()=>{ if(im.naturalWidth<1) reject(new Error(name+' 空圖片')); else {SPRITES[name]=im; resolve();} };
+      im.onerror = ()=>reject(new Error(name+' 圖片載入失敗：'+url));
+      im.src = url;
+    }))).catch(err=>{spritesLoading=null;throw err;});
+  }
+  return spritesLoading;
+}
+
+
 const MODE = {
   normal: { name: '普通士兵', hp: 180, speed: 150, dashSpeed: 420, dashCooldown: 2.7, fireRate: 0.62, range: 260, damage: 24, grenadeCD: 22, grenadeDamage: 90, grenadeRadius: 86, burstCD: 0 },
   hero: { name: '超級士兵', hp: 340, speed: 210, dashSpeed: 560, dashCooldown: 1.5, fireRate: 0.18, range: 320, damage: 36, grenadeCD: 8.5, grenadeDamage: 160, grenadeRadius: 126, burstCD: 12 }
@@ -84,7 +105,20 @@ function resume(){ if(S.phase!=='paused') return; S.phase='running'; show(''); S
 
 $('modeNormal').addEventListener('click',()=>setMode('normal'));
 $('modeHero').addEventListener('click',()=>setMode('hero'));
-$('startButton').addEventListener('click',()=>{ show('loadingScreen'); requestAnimationFrame(()=>requestAnimationFrame(()=>resetGame()));});
+$('startButton').addEventListener('click',async()=>{
+  show('loadingScreen');
+  try{
+    await ensureSprites();
+    // Allow loading overlay to paint, then reveal the fully prepared battlefield.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    resetGame();
+  }catch(err){
+    console.error('2.5D sprite load failed',err);
+    S.phase='menu'; setHUD(false); show('startScreen');
+    $('startButton').textContent='素材載入失敗，點此重試';
+    alert('人物圖片載入失敗，請確認 ZIP 裡的 src/battle2p5d/assets/ 三張 PNG 都已上傳。\n'+err.message);
+  }
+});
 $('pauseButton').addEventListener('click', pause);
 $('resumeButton').addEventListener('click', resume);
 $('retryButton').addEventListener('click', resetGame);
@@ -102,8 +136,8 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => input.keys.delete(e.code));
 
 function updateJoy(e){
-  const box = joyRegion.getBoundingClientRect();
-  const cx = box.left + 69, cy = box.top + 69;
+  const box = $('joystick').getBoundingClientRect();
+  const cx = box.left + box.width/2, cy = box.top + box.height/2;
   const dx = e.clientX - cx, dy = e.clientY - cy;
   const d = Math.max(1, hypot(dx, dy));
   const dist = Math.min(43, d);
@@ -140,8 +174,8 @@ function resetGame(){
   S.time = 0; S.kills = 0; S.wave = 1; S.enemies = []; S.bullets = []; S.effects = []; S.grenades = [];
   S.spawnTimer = 1.3;
   const m = MODE[S.type];
-  S.player = { x:0, y:0, r:22, hp:m.hp, maxHp:m.hp, aim:-Math.PI/2, moveAim:-Math.PI/2, anim:0, shotCD:.3, shotFlash:0, dashLeft:0, dashCooldown:0, invuln:0, grenadeCD:m.grenadeCD * .55, burstCD:m.burstCD, alive:true };
-  for(let i=0;i<6;i++) spawnEnemy(true);
+  S.player = { x:0, y:0, face:1, r:22, hp:m.hp, maxHp:m.hp, aim:-Math.PI/2, moveAim:-Math.PI/2, anim:0, shotCD:.3, shotFlash:0, dashLeft:0, dashCooldown:0, invuln:0, grenadeCD:m.grenadeCD * .55, burstCD:m.burstCD, alive:true };
+  for(let i=0;i<17;i++) spawnEnemy(true);
   S.camera.x = 0; S.camera.y = 0;
   setHUD(true); show(''); S.phase='running'; S.last = performance.now();
   $('modeLabel').textContent = m.name; $('waveText').textContent = '第 1 波'; $('skillText').textContent = S.type==='hero' ? '高速射擊 · 手榴彈' : '基本步槍';
@@ -176,8 +210,14 @@ function joystickMove(){
   const ky = Number(k.has('KeyS') || k.has('ArrowDown')) - Number(k.has('KeyW') || k.has('ArrowUp'));
   if(kx || ky){ const len = hypot(kx, ky) || 1; x = kx / len; y = ky / len; }
   const len = Math.min(1, hypot(x, y));
-  if(len > 1e-3){ x /= len; y /= len; }
-  return { x, y, len };
+  if(len > 1e-3){
+    // Inverse isometric projection: joystick UP means SCREEN UP, not world -Y/diagonal.
+    const wx=(x/S.isoX + y/S.isoY)*.5;
+    const wy=(y/S.isoY - x/S.isoX)*.5;
+    const magnitude=hypot(wx,wy)||1;
+    return {x:wx/magnitude,y:wy/magnitude,len};
+  }
+  return {x:0,y:0,len:0};
 }
 
 function circleRectCollide(x, y, r, o){
@@ -223,18 +263,22 @@ function nearestEnemy(range){
 }
 
 function spawnEnemy(first=false){
-  const p=S.player; const side = Math.floor(Math.random()*4); const half=S.mapHalf-40; let x=0,y=0;
-  if(side===0){ x = rand(-half, half); y = -half; }
-  else if(side===1){ x = half; y = rand(-half, half); }
-  else if(side===2){ x = rand(-half, half); y = half; }
-  else { x = -half; y = rand(-half, half); }
-  if(first){ x = rand(-380,380); y = rand(-340,340); if(hypot(x-p.x,y-p.y)<280){ x += 330; y += 220; }}
-  const waveMul = 1 + Math.min(1.2, S.time / 145);
-  const t = S.time > 35 && Math.random() < .12 ? 'heavy' : S.time > 18 && Math.random() < .18 ? 'ranger' : 'grunt';
-  const stat = t === 'grunt' ? {hp:58,speed:72,r:20,damage:12,shoot:.9,range:0}
-            : t === 'heavy' ? {hp:160,speed:48,r:25,damage:21,shoot:1.2,range:0}
-            : {hp:72,speed:58,r:20,damage:10,shoot:1.55,range:250};
-  S.enemies.push({type:t, x, y, r:stat.r, hp:stat.hp*waveMul, maxHp:stat.hp*waveMul, speed:stat.speed*(1+Math.min(.25,S.time/220)), damage:stat.damage, fireCD:rand(.25,1.2), atkCD:rand(.2,.8), aim:0, anim:Math.random()*6, hit:0, shotFlash:0});
+  const p=S.player; let x=0,y=0;
+  // Spawn around the current camera, not at distant map corners: enemies visibly surround the player.
+  for(let attempt=0;attempt<12;attempt++){
+    const angle=rand(0,TAU), distance=first ? rand(170,365) : rand(330,560);
+    x=clamp(p.x+Math.cos(angle)*distance,-S.mapHalf+35,S.mapHalf-35);
+    y=clamp(p.y+Math.sin(angle)*distance,-S.mapHalf+35,S.mapHalf-35);
+    if(canMove(x,y,22) && hypot(x-p.x,y-p.y)>115) break;
+  }
+  const waveMul=1+Math.min(1.0,S.time/160);
+  const t=S.time>35&&Math.random()<.12?'heavy':S.time>12&&Math.random()<.25?'ranger':'grunt';
+  const stat=t==='grunt' ? {hp:48,speed:65,r:18,damage:5}
+            : t==='heavy' ? {hp:145,speed:47,r:23,damage:15}
+            : {hp:62,speed:58,r:18,damage:7};
+  S.enemies.push({type:t,x,y,r:stat.r,hp:stat.hp*waveMul,maxHp:stat.hp*waveMul,
+    speed:stat.speed*(1+Math.min(.22,S.time/260)),damage:stat.damage,
+    fireCD:rand(.7,3.3),atkCD:rand(.3,1.2),aim:0,anim:Math.random()*6,hit:0,shotFlash:0,face:1});
 }
 
 function fireBullet(from, target, side, damage, speed=720, critChance=0){
@@ -244,7 +288,11 @@ function fireBullet(from, target, side, damage, speed=720, critChance=0){
   angle += spread;
   const vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
   const crit = side==='hero' && Math.random() < critChance;
-  S.bullets.push({ x:from.x, y:from.y, px:from.x, py:from.y, vx, vy, side, damage:crit? damage*1.6 : damage, ttl:1.1, crit });
+  const muzzle = spriteMuzzle(from, side==='hero' ? 'hero' : 'enemy');
+  const center=project(from.x,from.y,12);
+  S.bullets.push({ x:from.x, y:from.y, px:from.x, py:from.y, vx, vy, side,
+    damage:crit?damage*1.6:damage, ttl:1.1, crit, age:0,
+    startDX:muzzle.x-center.x, startDY:muzzle.y-center.y });
 }
 function flashText(x,y,text,col='#fff6c9'){ S.effects.push({type:'text', x, y, text, col, ttl:.55, life:.55}); }
 function ring(x,y,r,col){ S.effects.push({type:'ring', x,y,r,col, ttl:.35, life:.35}); }
@@ -289,6 +337,7 @@ function update(dt){
   if(move.len > .04) moveActor(p, move.x * speed * dt, move.y * speed * dt);
 
   const target = nearestEnemy(MODE[S.type].range);
+  p.autoTarget = target;
   if(target){
     const angle = Math.atan2(target.y-p.y, target.x-p.x);
     const diff = Math.atan2(Math.sin(angle-p.aim), Math.cos(angle-p.aim));
@@ -306,9 +355,10 @@ function update(dt){
   if(newWave !== S.wave){ S.wave = newWave; msg(`第 ${S.wave} 波敵軍逼近！`,1.5); beep('blast'); }
   S.spawnTimer -= dt;
   if(S.spawnTimer <= 0){
-    const amount = 2 + (S.type==='hero'?1:0) + (S.wave>4 && Math.random()<.45 ? 1 : 0);
-    for(let i=0;i<amount && S.enemies.length<60;i++) spawnEnemy(false);
-    S.spawnTimer = Math.max(.65, 1.6 - S.time * .007) * rand(.85,1.12);
+    const amount = 3 + (S.type==='hero'?1:0) + (S.wave>=3?1:0) + (S.wave>=5?1:0);
+    const cap = S.w<650 ? 55 : 78;
+    for(let i=0;i<amount && S.enemies.length<cap;i++) spawnEnemy(false);
+    S.spawnTimer = Math.max(.66, 1.42 - S.time*.0045)*rand(.88,1.12);
   }
 
   for(let i=S.enemies.length-1;i>=0;i--){
@@ -317,17 +367,26 @@ function update(dt){
     if(e.type==='ranger'){
       if(d > 220) moveActor(e, dx/d * e.speed * dt, dy/d * e.speed * dt);
       else if(d < 145) moveActor(e, -dx/d * e.speed * .7 * dt, -dy/d * e.speed * .7 * dt);
-      if(d < 300 && e.fireCD <= 0 && !lineBlocked(e.x,e.y,p.x,p.y)){
-        e.fireCD = 1.9; e.shotFlash = .55; fireBullet({x:e.x,y:e.y}, p, 'enemy', e.damage, 520, 0); burst(e.x,e.y,'muzzle',.08, 10);
+      if(d < 310 && e.fireCD <= 0 && !lineBlocked(e.x,e.y,p.x,p.y)){
+        e.fireCD = rand(2.1,2.9); e.shotFlash = .24;
+        fireBullet(e,p,'enemy',e.damage,520,0); beep('fire');
       }
     } else {
-      if(d > e.r + p.r + 2){ const side = Math.sin(S.time*1.2 + i) * .15; moveActor(e, Math.cos(e.aim+side)*e.speed*dt, Math.sin(e.aim+side)*e.speed*dt); }
-      if(d < e.r + p.r + 2 && e.atkCD <= 0){ e.atkCD = e.type==='heavy'?1.15:.92; damagePlayer(e.damage); }
+      if(d > (e.type==='heavy'?e.r+p.r+7:125)){
+        const side=Math.sin(S.time*1.2+i)*.16;
+        moveActor(e,Math.cos(e.aim+side)*e.speed*dt,Math.sin(e.aim+side)*e.speed*dt);
+      }
+      // Red riflemen also occasionally shoot; melee pressure remains from heavy soldiers.
+      if(e.type==='grunt' && d<245 && e.fireCD<=0 && !lineBlocked(e.x,e.y,p.x,p.y)){
+        e.fireCD=rand(3.0,4.0); e.shotFlash=.24;
+        fireBullet(e,p,'enemy',e.damage,470,0);
+      }
+      if(e.type==='heavy' && d<e.r+p.r+4 && e.atkCD<=0){e.atkCD=1.35;damagePlayer(e.damage);}
     }
   }
 
   for(let i=S.bullets.length-1;i>=0;i--){
-    const b=S.bullets[i]; b.ttl -= dt; b.px = b.x; b.py = b.y; b.x += b.vx*dt; b.y += b.vy*dt;
+    const b=S.bullets[i]; b.ttl -= dt; b.age += dt; b.px = b.x; b.py = b.y; b.x += b.vx*dt; b.y += b.vy*dt;
     let hit = false;
     if(b.ttl <= 0){ S.bullets.splice(i,1); continue; }
     for(const o of S.obstacles){ if(segmentRect(b.px,b.py,b.x,b.y,o.x-o.w/2,o.y-o.h/2,o.x+o.w/2,o.y+o.h/2)){ burst(b.x,b.y,'dust',.18,8); hit = true; break; } }
@@ -420,109 +479,63 @@ function drawSandbag(o){
 }
 function drawObstacle(o){ if(o.type==='crate') drawCrate(o); else drawSandbag(o); }
 
-function facingIndex(angle){
-  const a = (angle + TAU + Math.PI/8) % TAU;
-  return Math.floor(a / (Math.PI/4)) % 8; // 0:E,1:SE,2:S,3:SW,4:W,5:NW,6:N,7:NE
+// Character art is a REAL full-body PNG. Both factions face right in the source art;
+// left-facing frames are mirrored around the footprint, not independently generated.
+function facingRight(actor){
+  const dx=Math.cos(actor.aim)-Math.sin(actor.aim);
+  if(Math.abs(dx)>.035) actor.face=dx>=0?1:-1;
+  return actor.face||1;
 }
-function drawCharacter(actor, team='hero', shadow=true){
-  const pos = project(actor.x, actor.y, 0);
-  const scale = S.scale * (team==='hero' ? 1.02 : (actor.type==='heavy' ? 1.06 : 1));
-  const bob = Math.sin(actor.anim * 8) * 3 * scale;
-  if(shadow) screenEllipse(pos.x, pos.y + 24*scale, 18*scale, 8*scale, '#33493544');
-
-  const facing = facingIndex(actor.aim);
-  const ally = team === 'hero';
-  const base = ally ? { coat:'#567b53', cloth:'#7ea46c', dark:'#35523f', helmet:'#446348', skin:'#ead5ac', gun:'#313d36', trim:'#d6be89'}
-                    : actor.type==='heavy' ? { coat:'#9f6459', cloth:'#c48b7d', dark:'#623d36', helmet:'#824e46', skin:'#e2b395', gun:'#342f2f', trim:'#dfb08b'}
-                      : { coat:'#b66c5f', cloth:'#d79484', dark:'#6f4740', helmet:'#97584d', skin:'#e5b395', gun:'#342f2f', trim:'#dfb08b'};
-
-  ctx.save(); ctx.translate(pos.x, pos.y - 16*scale + bob);
-
-  // body proportions: larger, visible face, more like a character than a marker.
-  const front = [1,2,3].includes(facing); // SE,S,SW toward viewer
-  const back  = [5,6,7].includes(facing);
-  const sideR = facing===0 || facing===1 || facing===7;
-  const sideL = facing===3 || facing===4 || facing===5;
-  const dirX = sideR ? 1 : sideL ? -1 : 0;
-
-  // legs
-  rr(-11*scale, 18*scale + Math.sin(actor.anim*8)*2*scale, 9*scale, 19*scale, 4*scale, base.dark);
-  rr(2*scale, 18*scale - Math.sin(actor.anim*8)*2*scale, 9*scale, 19*scale, 4*scale, base.dark);
-  rr(-13*scale, 33*scale + Math.sin(actor.anim*8)*2*scale, 13*scale, 6*scale, 3*scale, '#272625');
-  rr(2*scale, 33*scale - Math.sin(actor.anim*8)*2*scale, 13*scale, 6*scale, 3*scale, '#272625');
-
-  // torso
-  rr(-16*scale, -2*scale, 32*scale, 28*scale, 10*scale, base.coat);
-  rr(-11*scale, 3*scale, 22*scale, 15*scale, 6*scale, base.cloth);
-  line2(0,-2*scale,0,24*scale, ally ? '#3a5c46' : '#825146', 2*scale);
-  rr(-4*scale, 10*scale, 8*scale, 8*scale, 2*scale, base.trim);
-
-  // arms and gun based on facing
-  const armY = 4*scale;
-  if(front){
-    rr(-20*scale, armY, 11*scale, 8*scale, 4*scale, base.coat);
-    rr(9*scale, armY+1*scale, 12*scale, 8*scale, 4*scale, base.coat);
-    rr(6*scale, 6*scale, 28*scale, 7*scale, 2*scale, base.gun);
-    rr(20*scale, 5*scale, 18*scale, 4*scale, 2*scale, '#222c27');
-    rr(2*scale, 2*scale, 8*scale, 10*scale, 2*scale, '#5b6d57');
-    screenEllipse(31*scale, 9*scale, 4*scale, 4*scale, base.skin);
-  } else if(back){
-    rr(-21*scale, armY, 12*scale, 8*scale, 4*scale, base.coat);
-    rr(9*scale, armY, 12*scale, 8*scale, 4*scale, base.coat);
-    rr(2*scale, 8*scale, 28*scale, 7*scale, 2*scale, base.gun);
-    rr(16*scale, 7*scale, 18*scale, 4*scale, 2*scale, '#222c27');
-  } else if(sideR){
-    rr(-7*scale, armY+1*scale, 10*scale, 8*scale, 4*scale, base.coat);
-    rr(10*scale, armY-2*scale, 10*scale, 8*scale, 4*scale, base.coat);
-    rr(6*scale, 4*scale, 33*scale, 7*scale, 2*scale, base.gun);
-    rr(25*scale, 3*scale, 20*scale, 4*scale, 2*scale, '#222c27');
-    screenEllipse(18*scale, 6*scale, 4*scale, 4*scale, base.skin);
-  } else {
-    rr(-19*scale, armY-2*scale, 10*scale, 8*scale, 4*scale, base.coat);
-    rr(-2*scale, armY+1*scale, 10*scale, 8*scale, 4*scale, base.coat);
-    rr(-39*scale, 4*scale, 33*scale, 7*scale, 2*scale, base.gun);
-    rr(-45*scale, 3*scale, 20*scale, 4*scale, 2*scale, '#222c27');
-    screenEllipse(-18*scale, 6*scale, 4*scale, 4*scale, base.skin);
+function spriteRect(actor,team='hero'){
+  const allied=team==='hero';
+  const aiming=!allied||!!actor.autoTarget;
+  const key=allied ? (aiming?'heroAim':'heroLow') : 'enemyAim';
+  const img=SPRITES[key];
+  if(!img)return null;
+  const h=(allied?123:actor.type==='heavy'?99:83)*S.scale;
+  const w=img.naturalWidth/img.naturalHeight*h;
+  const at=project(actor.x,actor.y,0);
+  const bob=(Math.sin(actor.anim*8)*1.6)*S.scale;
+  const face=facingRight(actor);
+  return {img,key,at,face,w,h,x:at.x-w*.49,y:at.y-h+15*S.scale+bob};
+}
+function spriteMuzzle(actor,team){
+  const rect=spriteRect(actor,team);if(!rect)return project(actor.x,actor.y,12);
+  // The muzzle is normalized to the right-facing cropped artwork.
+  const u=rect.key==='heroLow'?.92:.965;
+  const v=rect.key==='heroLow'?.78:.365;
+  const x=rect.at.x+rect.face*(u-.49)*rect.w;
+  return {x,y:rect.y+v*rect.h};
+}
+function drawCharacter(actor,team='hero'){
+  const rect=spriteRect(actor,team);if(!rect)return;
+  const {at,face,w,h,x,y,img}=rect;
+  if(x>S.w+110||x+w<-110||y>S.h+90||y+h<-110)return;
+  // Small runtime contact shadow only; the original art's white background is removed.
+  screenEllipse(at.x,at.y+12*S.scale,19*S.scale,6*S.scale,'rgba(48,66,45,.23)');
+  ctx.save();
+  if(actor.hit>0){ctx.globalAlpha=.82;}
+  if(face<0){
+    ctx.translate(at.x,0);ctx.scale(-1,1);ctx.translate(-at.x,0);
   }
-
-  // head
-  screenEllipse(0, -11*scale, 15*scale, 16*scale, base.skin);
-  // face details
-  if(front){
-    screenEllipse(-5*scale, -12*scale, 2.2*scale, 2.2*scale, '#221b19');
-    screenEllipse(5*scale, -12*scale, 2.2*scale, 2.2*scale, '#221b19');
-    line2(-2*scale,-5*scale,2*scale,-5*scale,'#9f7463',1.1*scale);
-  } else if(sideR){
-    screenEllipse(5*scale, -12*scale, 2.2*scale, 2.2*scale, '#221b19');
-    line2(7*scale,-9*scale,10*scale,-8*scale,'#9f7463',1.0*scale);
-  } else if(sideL){
-    screenEllipse(-5*scale, -12*scale, 2.2*scale, 2.2*scale, '#221b19');
-    line2(-10*scale,-8*scale,-7*scale,-9*scale,'#9f7463',1.0*scale);
-  }
-  // helmet
-  screenEllipse(0,-15*scale, 17*scale, 11*scale, base.helmet);
-  rr(-15*scale,-15*scale,30*scale,8*scale,4*scale,base.helmet);
-  if(ally){ screenEllipse(0,-13*scale, 3*scale, 3*scale, '#d4bc83'); }
-
-  if(actor.shotFlash > 0){
-    ctx.fillStyle = '#ffe9a8'; ctx.beginPath();
-    const fx = front||sideR ? 48*scale : -48*scale;
-    const fy = front ? 8*scale : 7*scale;
-    ctx.moveTo(fx, fy);
-    ctx.lineTo(fx + (front||sideR? 14:-14)*scale, fy - 6*scale);
-    ctx.lineTo(fx + (front||sideR? 10:-10)*scale, fy);
-    ctx.lineTo(fx + (front||sideR? 14:-14)*scale, fy + 6*scale);
-    ctx.closePath(); ctx.fill();
-  }
+  // Keep both hero frames the same foot baseline and body height; slight bob while running.
+  ctx.drawImage(img,x,y,w,h);
   ctx.restore();
-
-  // hp bar for enemies
-  if(team==='enemy' && actor.hp < actor.maxHp){
-    rr(pos.x-18*scale, pos.y-54*scale, 36*scale, 5*scale, 2*scale, 'rgba(84,44,39,.66)');
-    rr(pos.x-18*scale, pos.y-54*scale, 36*scale * clamp(actor.hp/actor.maxHp,0,1), 5*scale, 2*scale, '#df9279');
+  if(actor.shotFlash>0){
+    const m=spriteMuzzle(actor,team);
+    const s=S.scale*(team==='hero'?1.2:.8);
+    ctx.save();ctx.translate(m.x,m.y);ctx.scale(face,1);
+    ctx.fillStyle='#fff7c0';ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(16*s,-6*s);ctx.lineTo(24*s,0);ctx.lineTo(16*s,6*s);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ffb94f';ctx.beginPath();ctx.moveTo(6*s,0);ctx.lineTo(30*s,-11*s);ctx.lineTo(23*s,0);ctx.lineTo(30*s,11*s);ctx.closePath();ctx.fill();ctx.restore();
+  }
+  if(team==='enemy' && actor.hp<actor.maxHp){
+    rr(at.x-20*S.scale,y-7*S.scale,40*S.scale,4*S.scale,2*S.scale,'rgba(84,44,39,.7)');
+    rr(at.x-20*S.scale,y-7*S.scale,40*S.scale*clamp(actor.hp/actor.maxHp,0,1),4*S.scale,2*S.scale,'#e09a7b');
   }
   if(team==='hero'){
-    ctx.fillStyle='#fff6ce'; ctx.beginPath(); ctx.moveTo(pos.x,pos.y-62*scale); ctx.lineTo(pos.x-8*scale,pos.y-76*scale); ctx.lineTo(pos.x+8*scale,pos.y-76*scale); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fff3ad';ctx.beginPath();
+    const top=y-12*S.scale;
+    ctx.moveTo(at.x,top+9*S.scale);ctx.lineTo(at.x-7*S.scale,top);ctx.lineTo(at.x+7*S.scale,top);ctx.closePath();ctx.fill();
   }
 }
 
@@ -536,7 +549,15 @@ function drawGrenade(g){
   screenEllipse(p.x,p.y+4*S.scale, 7*S.scale, 3*S.scale, 'rgba(42,56,42,.32)');
   screenEllipse(p.x,p.y, 6*S.scale, 6*S.scale, '#4d6448'); rr(p.x+3*S.scale,p.y-8*S.scale,3*S.scale,5*S.scale,1*S.scale,'#d5cfac');
 }
-function drawBullet(b){ const a=project(b.px,b.py,12), c=project(b.x,b.y,12); line2(a.x,a.y,c.x,c.y,b.side==='hero' ? '#ffef9e' : '#ff8d78', b.side==='hero' ? 3 : 3.6); screenEllipse(c.x,c.y,3,3,'#fff7db'); }
+function drawBullet(b){
+  const a=project(b.px,b.py,12),c=project(b.x,b.y,12);
+  // Start tracer at actual sprite muzzle, easing onto the physics path over 0.15s.
+  const offset=clamp(1-b.age/.15,0,1);
+  const sx=a.x+b.startDX*offset,sy=a.y+b.startDY*offset;
+  const ex=c.x+b.startDX*offset,ey=c.y+b.startDY*offset;
+  line2(sx,sy,ex,ey,b.side==='hero'?'#ffef9e':'#ff8d78',b.side==='hero'?3:3.6);
+  screenEllipse(ex,ey,2.7,2.7,'#fff7db');
+}
 
 function renderEffects(){
   for(const e of S.effects){
@@ -555,11 +576,11 @@ function render(){
   drawGround();
 
   const drawList = [];
-  for(const o of S.obstacles) drawList.push({sort:o.x+o.y+1000, fn:()=>drawObstacle(o)});
-  for(const g of S.grenades) drawList.push({sort:g.x+g.y+1300, fn:()=>drawGrenade(g)});
-  for(const b of S.bullets) drawList.push({sort:b.y+b.x+1600, fn:()=>drawBullet(b)});
-  for(const e of S.enemies) drawList.push({sort:e.x+e.y+2000, fn:()=>drawCharacter(e,'enemy')});
-  if(S.player) drawList.push({sort:S.player.x+S.player.y+2001, fn:()=>{ if(S.player.invuln<=0 || Math.floor(S.time*20)%2===0) drawCharacter(S.player,'hero'); }});
+  for(const o of S.obstacles) drawList.push({sort:o.x+o.y, fn:()=>drawObstacle(o)});
+  for(const g of S.grenades) drawList.push({sort:g.x+g.y+1, fn:()=>drawGrenade(g)});
+  for(const b of S.bullets) drawList.push({sort:b.y+b.x+2, fn:()=>drawBullet(b)});
+  for(const e of S.enemies) drawList.push({sort:e.x+e.y+3, fn:()=>drawCharacter(e,'enemy')});
+  if(S.player) drawList.push({sort:S.player.x+S.player.y+4, fn:()=>{ if(S.player.invuln<=0 || Math.floor(S.time*20)%2===0) drawCharacter(S.player,'hero'); }});
   drawList.sort((a,b)=>a.sort-b.sort);
   for(const item of drawList) item.fn();
   renderEffects();

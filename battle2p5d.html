@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#8da185">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>國軍模擬器｜2.5D 戰鬥人物測試</title>
-  <link rel="stylesheet" href="./src/battle2p5d/game.css?v=0132">
+  <title>國軍模擬器｜2.5D 實際角色戰鬥版</title>
+  <link rel="stylesheet" href="./src/battle2p5d/game.css?v=0133">
 </head>
 <body>
-  <main id="gameRoot" aria-label="國軍模擬器 2.5D 戰鬥人物測試">
+  <main id="gameRoot" aria-label="國軍模擬器 2.5D 實際角色戰鬥版">
     <canvas id="battleCanvas" aria-label="戰鬥畫面"></canvas>
     <header id="hud" hidden>
       <div class="hud-top">
@@ -28,11 +28,11 @@
     <section id="startScreen" class="screen">
       <div class="start-shade"></div>
       <div class="menu-panel">
-        <div class="eyebrow">ARMY PROJECT <span>2.5D CHARACTER COMBAT / v0.13.2</span></div>
+        <div class="eyebrow">ARMY PROJECT <span>2.5D CHARACTER COMBAT / v0.13.3</span></div>
         <div class="crest"><span class="crest-stars">✦ ✦</span><div class="crest-soldier">兵</div><span class="crest-small">人物測試</span></div>
         <h1>國軍模擬器</h1>
-        <h2>2.5D 戰鬥人物測試</h2>
-        <p class="subtitle">這版重點不是完整戰鬥，而是測試：<b>人物臉部、轉向、持槍、跑步時看起來有沒有比較像你要的感覺。</b></p>
+        <h2>2.5D 實際角色戰鬥版</h2>
+        <p class="subtitle">這版已使用你選定的三張角色圖，測試：<b>人物鏡像、舉槍、操作與大量敵軍的感覺。</b></p>
         <div class="rule"></div>
         <p class="field-label">士兵能力測試</p>
         <div class="mode-picker" role="group" aria-label="選擇士兵強度">
@@ -54,6 +54,6 @@
     </section>
     <div id="loadingScreen" class="screen overlay" hidden><div class="modal-panel loading"><div class="spinner"></div><h2>正在進入測試場…</h2><p>載入 2.5D 人物與戰場</p></div></div>
   </main>
-  <script type="module" src="./src/battle2p5d/game.js?v=0131"></script>
+  <script type="module" src="./src/battle2p5d/game.js?v=0133"></script>
 </body>
 </html>
