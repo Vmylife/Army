@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#8da185">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>國軍模擬器｜2.5D 戰鬥人物測試</title>
+  <link rel="stylesheet" href="./src/battle2p5d/game.css?v=0131">
+</head>
+<body>
+  <main id="gameRoot" aria-label="國軍模擬器 2.5D 戰鬥人物測試">
+    <canvas id="battleCanvas" aria-label="戰鬥畫面"></canvas>
+    <header id="hud" hidden>
+      <div class="hud-top">
+        <div class="hud-chip"><span class="tiny-label">作戰時間</span><strong id="timeText">00:00</strong></div>
+        <div class="hud-chip center"><span class="tiny-label">擊退敵軍</span><strong id="killText">0</strong></div>
+        <button class="icon-button" id="pauseButton" aria-label="暫停遊戲">Ⅱ</button>
+      </div>
+      <div class="health-wrap"><span class="hp-label">生命值</span><div class="hp-track"><div class="hp-fill" id="hpFill"></div></div><strong id="hpText">100/100</strong></div>
+      <div class="wave-row"><span id="modeLabel">普通士兵</span><span id="waveText">第 1 波</span><span id="skillText">步槍</span></div>
+    </header>
+    <div id="floatMsg" aria-live="polite" aria-atomic="true"></div>
+    <div id="controls" hidden>
+      <div id="joyRegion" aria-label="虛擬搖桿"><div id="joystick"><div id="joyRing"></div><div id="joyThumb"></div></div><span class="control-hint">移動</span></div>
+      <div class="right-controls"><button id="dashButton" class="dash-btn" aria-label="閃避衝刺"><span class="dash-icon">»</span><small id="dashLabel">閃避</small></button><span class="control-hint">自動射擊</span></div>
+    </div>
+    <section id="startScreen" class="screen">
+      <div class="start-shade"></div>
+      <div class="menu-panel">
+        <div class="eyebrow">ARMY PROJECT <span>2.5D CHARACTER COMBAT / v0.13.1</span></div>
+        <div class="crest"><span class="crest-stars">✦ ✦</span><div class="crest-soldier">兵</div><span class="crest-small">人物測試</span></div>
+        <h1>國軍模擬器</h1>
+        <h2>2.5D 戰鬥人物測試</h2>
+        <p class="subtitle">這版重點不是完整戰鬥，而是測試：<b>人物臉部、轉向、持槍、跑步時看起來有沒有比較像你要的感覺。</b></p>
+        <div class="rule"></div>
+        <p class="field-label">士兵能力測試</p>
+        <div class="mode-picker" role="group" aria-label="選擇士兵強度">
+          <button id="modeNormal" class="mode-card selected" aria-pressed="true"><span class="mode-symbol">◆</span><b>普通士兵</b><small>射速慢 · 跑得慢 · 基本步槍</small></button>
+          <button id="modeHero" class="mode-card" aria-pressed="false"><span class="mode-symbol">✦</span><b>超級士兵</b><small>高射速 · 跑得快 · 手榴彈</small></button>
+        </div>
+        <button id="startButton" class="primary-btn">開始測試 <span>›</span></button>
+        <div class="menu-foot"><span>重點：看人物是不是像一個阿兵哥，不是看數值平衡</span><span>左手移動　·　右手閃避　·　自動瞄準射擊</span></div>
+      </div>
+    </section>
+    <section id="pauseScreen" class="screen overlay" hidden>
+      <div class="modal-panel"><span class="eyebrow">PAUSED</span><h2>暫停作戰</h2><p>可以喘口氣，敵人暫時不會動。</p><button id="resumeButton" class="primary-btn">繼續戰鬥</button><button id="pauseMenuButton" class="secondary-btn">返回選單</button></div>
+    </section>
+    <section id="endScreen" class="screen overlay" hidden>
+      <div class="modal-panel"><span class="eyebrow" id="endEyebrow">TEST COMPLETE</span><div class="finish-medal">★</div><h2 id="endTitle">測試結束</h2><p id="endDescription">這次人物戰鬥測試結束。</p>
+        <div class="results"><div><small>擊退敵軍</small><strong id="endKills">0</strong></div><div><small>存活時間</small><strong id="endTime">00:00</strong></div><div><small>最高波次</small><strong id="endWave">1</strong></div></div>
+        <button id="retryButton" class="primary-btn">再試一次</button><button id="endMenuButton" class="secondary-btn">返回選單</button>
+      </div>
+    </section>
+    <div id="loadingScreen" class="screen overlay" hidden><div class="modal-panel loading"><div class="spinner"></div><h2>正在進入測試場…</h2><p>載入 2.5D 人物與戰場</p></div></div>
+  </main>
+  <script type="module" src="./src/battle2p5d/game.js?v=0131"></script>
+</body>
+</html>
