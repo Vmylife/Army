@@ -52,3 +52,6 @@ h1{font-size:40px;margin:10px 0 0} h2{font-size:24px;margin:4px 0 12px;color:#33
   #floatMsg{top:calc(env(safe-area-inset-top) + 118px);font-size:13px}
   #joystick{width:124px;height:124px}.dash-btn{width:88px;height:88px}
 }
+
+/* v0.13.2: hidden attribute must override modal layout display:grid. */
+html [hidden]{display:none!important}
