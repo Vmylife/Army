@@ -10,11 +10,21 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const hypot = Math.hypot;
 const formatTime = t => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
-// v0.13.3: actual character artwork, cropped transparent PNGs shipped inside this ZIP.
+// v0.13.4: keep original character artwork; add alpha PNG muzzle flashes and hit sprites.
 const SPRITE_URLS = {
   heroLow: './src/battle2p5d/assets/hero_low.png?v=0133',
   heroAim: './src/battle2p5d/assets/hero_aim.png?v=0133',
   enemyAim: './src/battle2p5d/assets/enemy_aim.png?v=0133',
+  muzzle1: './src/battle2p5d/assets/hero_muzzle_01.png?v=0134',
+  muzzle2: './src/battle2p5d/assets/hero_muzzle_02.png?v=0134',
+  muzzle3: './src/battle2p5d/assets/hero_muzzle_03.png?v=0134',
+  muzzle4: './src/battle2p5d/assets/hero_muzzle_04.png?v=0134',
+  sparkSoldier1: './src/battle2p5d/assets/hit_soldier_01.png?v=0134',
+  sparkSoldier2: './src/battle2p5d/assets/hit_soldier_02.png?v=0134',
+  sparkSoldier3: './src/battle2p5d/assets/hit_soldier_03.png?v=0134',
+  sparkCover1: './src/battle2p5d/assets/hit_cover_01.png?v=0134',
+  sparkCover2: './src/battle2p5d/assets/hit_cover_02.png?v=0134',
+  sparkCover3: './src/battle2p5d/assets/hit_cover_03.png?v=0134', 
 };
 const SPRITES = {};
 let spritesLoading = null;
@@ -51,6 +61,7 @@ const S = {
   player: null,
   enemies: [],
   bullets: [],
+  trailGhosts: [],
   effects: [],
   grenades: [],
   obstacles: [],
@@ -171,7 +182,7 @@ function buildWorld(){
 function resetGame(){
   clearInput();
   buildWorld();
-  S.time = 0; S.kills = 0; S.wave = 1; S.enemies = []; S.bullets = []; S.effects = []; S.grenades = [];
+  S.time = 0; S.kills = 0; S.wave = 1; S.enemies = []; S.bullets = []; S.trailGhosts = []; S.effects = []; S.grenades = [];
   S.spawnTimer = 1.3;
   const m = MODE[S.type];
   S.player = { x:0, y:0, face:1, r:22, hp:m.hp, maxHp:m.hp, aim:-Math.PI/2, moveAim:-Math.PI/2, anim:0, shotCD:.3, shotFlash:0, dashLeft:0, dashCooldown:0, invuln:0, grenadeCD:m.grenadeCD * .55, burstCD:m.burstCD, alive:true };
@@ -281,25 +292,77 @@ function spawnEnemy(first=false){
     fireCD:rand(.7,3.3),atkCD:rand(.3,1.2),aim:0,anim:Math.random()*6,hit:0,shotFlash:0,face:1});
 }
 
-function fireBullet(from, target, side, damage, speed=720, critChance=0){
-  const dx = target.x - from.x, dy = target.y - from.y, len = hypot(dx,dy) || 1;
-  let angle = Math.atan2(dy, dx);
-  const spread = side==='hero' ? rand(-.05,.05) : rand(-.08,.08);
-  angle += spread;
-  const vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
-  const crit = side==='hero' && Math.random() < critChance;
-  const muzzle = spriteMuzzle(from, side==='hero' ? 'hero' : 'enemy');
-  const center=project(from.x,from.y,12);
-  S.bullets.push({ x:from.x, y:from.y, px:from.x, py:from.y, vx, vy, side,
-    damage:crit?damage*1.6:damage, ttl:1.1, crit, age:0,
-    startDX:muzzle.x-center.x, startDY:muzzle.y-center.y });
+// Convert an on-screen barrel/torso position back into the isometric combat plane.
+// Projectiles advance in world coordinates; only VFX is drawn in screen coordinates.
+function unprojectScreen(sx, sy, z=12){
+  const u=(sx-S.w*.5)/(S.isoX*S.scale);
+  const v=(sy-S.h*.5+z*S.scale)/(S.isoY*S.scale);
+  return {x:S.camera.x+(u+v)*.5, y:S.camera.y+(v-u)*.5};
+}
+function actorBodyPoint(a, team){
+  const rect=spriteRect(a,team);
+  if(!rect)return {x:a.x,y:a.y};
+  // The transparent illustration is anchored at the feet: target its torso, not the feet.
+  return unprojectScreen(rect.at.x,rect.y+rect.h*.55,12);
+}
+function fireBullet(from,target,side,damage,speed=650,critChance=0){
+  const team=side==='hero'?'hero':'enemy';
+  const m=spriteMuzzle(from,team);
+  const start=unprojectScreen(m.x,m.y,12);
+  const end=actorBodyPoint(target,side==='hero'?'enemy':'hero');
+  const dx=end.x-start.x,dy=end.y-start.y;
+  const spread=side==='hero'?rand(-.028,.028):rand(-.07,.07);
+  const angle=Math.atan2(dy,dx)+spread;
+  const crit=side==='hero'&&Math.random()<critChance;
+  const bullet={x:start.x,y:start.y,px:start.x,py:start.y,
+    vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+    side,damage:crit?damage*1.6:damage,ttl:1.25,crit,age:0,
+    trail:[{x:start.x,y:start.y}]};
+  S.bullets.push(bullet);
+  from.flashVariant=Math.floor(Math.random()*4)+1;
+  // Cap for rare high-entity scenes so effect workload remains bounded on phones.
+  if(S.bullets.length>135)S.bullets.splice(0,S.bullets.length-135);
+}
+// Returns first intersection fraction in [0,1], or null (nearest visible impact).
+function impactCircleT(ax,ay,bx,by,cx,cy,r){
+  const dx=bx-ax,dy=by-ay, fx=ax-cx,fy=ay-cy;
+  const A=dx*dx+dy*dy; if(A<1e-9)return null;
+  const C=fx*fx+fy*fy-r*r;
+  if(C<=0)return 0;
+  const B=2*(fx*dx+fy*dy);const disc=B*B-4*A*C;
+  if(disc<0)return null;
+  const t=(-B-Math.sqrt(disc))/(2*A);
+  return t>=0&&t<=1?t:null;
+}
+function impactRectT(ax,ay,bx,by,o){
+  const bounds=[[ax,bx-ax,o.x-o.w*.5,o.x+o.w*.5],
+                [ay,by-ay,o.y-o.h*.5,o.y+o.h*.5]];
+  let t0=0,t1=1;
+  for(const [p,d,lo,hi] of bounds){
+    if(Math.abs(d)<1e-9){if(p<lo||p>hi)return null;}
+    else{let a=(lo-p)/d,b=(hi-p)/d;if(a>b)[a,b]=[b,a];
+      t0=Math.max(t0,a);t1=Math.min(t1,b);if(t0>t1)return null;}
+  }
+  return t0;
+}
+function addImpact(kind,x,y){
+  // Two different, three-frame PNG animations. Sprite not used as a projectile.
+  S.effects.push({type:kind==='cover'?'coverSpark':'soldierSpark',x,y,z:12,ttl:.138,life:.138});
+  if(S.effects.length>90)S.effects.splice(0,S.effects.length-90);
+}
+function retireBullet(i,b,keepTrail=true){
+  if(keepTrail&&b.trail.length>1){
+    S.trailGhosts.push({side:b.side,trail:b.trail.map(p=>({x:p.x,y:p.y})),life:.105,ttl:.105});
+    if(S.trailGhosts.length>32)S.trailGhosts.shift();
+  }
+  S.bullets.splice(i,1);
 }
 function flashText(x,y,text,col='#fff6c9'){ S.effects.push({type:'text', x, y, text, col, ttl:.55, life:.55}); }
 function ring(x,y,r,col){ S.effects.push({type:'ring', x,y,r,col, ttl:.35, life:.35}); }
 function burst(x,y,type='hit',ttl=.25,r=10){ S.effects.push({type, x,y, ttl, life:ttl, r}); }
 
 function damageEnemy(e, dmg){
-  e.hp -= dmg; e.hit = .14; burst(e.x,e.y,'hit',.22, 12); beep('hit');
+  e.hp -= dmg; e.hit = .14; {const hit=actorBodyPoint(e,'enemy');addImpact('soldier',hit.x,hit.y);} beep('hit');
   if(e.hp <= 0){
     const idx = S.enemies.indexOf(e); if(idx>=0) S.enemies.splice(idx,1);
     S.kills++; burst(e.x,e.y,'death',.42, 18); flashText(e.x,e.y, Math.round(dmg), '#ffe5b1');
@@ -308,7 +371,7 @@ function damageEnemy(e, dmg){
 }
 function damagePlayer(dmg){
   const p=S.player; if(p.invuln>0 || S.phase!=='running') return;
-  p.hp -= dmg; p.invuln = .32; burst(p.x,p.y,'hurt',.25, 14); beep('hurt');
+  p.hp -= dmg; p.invuln = .32; {const hit=actorBodyPoint(p,'hero');addImpact('soldier',hit.x,hit.y);} beep('hurt');
   if(p.hp <= 0){ p.hp = 0; p.alive = false; finish(true); }
 }
 function throwGrenade(){
@@ -343,7 +406,7 @@ function update(dt){
     const diff = Math.atan2(Math.sin(angle-p.aim), Math.cos(angle-p.aim));
     p.aim += diff * Math.min(1, dt*12);
     if(p.shotCD <= 0){
-      p.shotCD = MODE[S.type].fireRate; p.shotFlash = .55; fireBullet({x:p.x,y:p.y}, target, 'hero', MODE[S.type].damage, 740, S.type==='hero' ? .24 : .08); burst(p.x,p.y,'muzzle',.09, 12); beep('fire');
+      p.shotCD = MODE[S.type].fireRate; p.shotFlash = .55; fireBullet(p, target, 'hero', MODE[S.type].damage, 680, S.type==='hero' ? .24 : .08); beep('fire');
     }
   } else if(move.len > .08) {
     const diff = Math.atan2(Math.sin(p.moveAim-p.aim), Math.cos(p.moveAim-p.aim));
@@ -385,15 +448,48 @@ function update(dt){
     }
   }
 
+  // Animated projectiles: actual world-space movement, swept collisions, 0.17 s history.
+  // All effects remain independent of the PNG artwork, enabling visible left/right shots.
   for(let i=S.bullets.length-1;i>=0;i--){
-    const b=S.bullets[i]; b.ttl -= dt; b.age += dt; b.px = b.x; b.py = b.y; b.x += b.vx*dt; b.y += b.vy*dt;
-    let hit = false;
-    if(b.ttl <= 0){ S.bullets.splice(i,1); continue; }
-    for(const o of S.obstacles){ if(segmentRect(b.px,b.py,b.x,b.y,o.x-o.w/2,o.y-o.h/2,o.x+o.w/2,o.y+o.h/2)){ burst(b.x,b.y,'dust',.18,8); hit = true; break; } }
-    if(!hit && b.side==='hero'){
-      for(const e of S.enemies){ if(segmentCircle(b.px,b.py,b.x,b.y,e.x,e.y,e.r+2)){ damageEnemy(e,b.damage); hit = true; break; } }
-    } else if(!hit && b.side==='enemy' && segmentCircle(b.px,b.py,b.x,b.y,p.x,p.y,p.r+2)){ damagePlayer(b.damage); hit = true; }
-    if(hit) S.bullets.splice(i,1);
+    const b=S.bullets[i]; b.ttl-=dt;b.age+=dt;
+    b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;
+    let hitT=1,hitObject=null,hitType=null;
+    for(const o of S.obstacles){
+      const t=impactRectT(b.px,b.py,b.x,b.y,o);
+      if(t!==null&&t<hitT){hitT=t;hitObject=o;hitType='cover';}
+    }
+    if(b.side==='hero'){
+      for(const e of S.enemies){
+        const a=actorBodyPoint(e,'enemy');
+        const t=impactCircleT(b.px,b.py,b.x,b.y,a.x,a.y,e.r+9);
+        if(t!==null&&t<hitT){hitT=t;hitObject=e;hitType='enemy';}
+      }
+    }else{
+      const a=actorBodyPoint(p,'hero');
+      const t=impactCircleT(b.px,b.py,b.x,b.y,a.x,a.y,p.r+7);
+      if(t!==null&&t<hitT){hitT=t;hitObject=p;hitType='hero';}
+    }
+    if(hitObject){
+      b.x=b.px+(b.x-b.px)*hitT;
+      b.y=b.py+(b.y-b.py)*hitT;
+    }
+    b.trail.unshift({x:b.x,y:b.y});
+    // Distance-limited trail: enough to read on a 393px phone but not a laser beam.
+    while(b.trail.length>10)b.trail.pop();
+    const head=b.trail[0];
+    while(b.trail.length>2&&hypot(head.x-b.trail[b.trail.length-1].x,head.y-b.trail[b.trail.length-1].y)>170)b.trail.pop();
+    if(hitObject){
+      if(hitType==='cover')addImpact('cover',b.x,b.y);
+      else if(hitType==='enemy')damageEnemy(hitObject,b.damage);
+      else if(hitType==='hero')damagePlayer(b.damage);
+      retireBullet(i,b,true);
+    }else if(b.ttl<=0||Math.abs(b.x)>S.mapHalf+150||Math.abs(b.y)>S.mapHalf+150){
+      retireBullet(i,b,false);
+    }
+  }
+  for(let i=S.trailGhosts.length-1;i>=0;i--){
+    S.trailGhosts[i].life-=dt;
+    if(S.trailGhosts[i].life<=0)S.trailGhosts.splice(i,1);
   }
 
   for(let i=S.grenades.length-1;i>=0;i--){
@@ -523,10 +619,23 @@ function drawCharacter(actor,team='hero'){
   ctx.restore();
   if(actor.shotFlash>0){
     const m=spriteMuzzle(actor,team);
-    const s=S.scale*(team==='hero'?1.2:.8);
-    ctx.save();ctx.translate(m.x,m.y);ctx.scale(face,1);
-    ctx.fillStyle='#fff7c0';ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(16*s,-6*s);ctx.lineTo(24*s,0);ctx.lineTo(16*s,6*s);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#ffb94f';ctx.beginPath();ctx.moveTo(6*s,0);ctx.lineTo(30*s,-11*s);ctx.lineTo(23*s,0);ctx.lineTo(30*s,11*s);ctx.closePath();ctx.fill();ctx.restore();
+    if(team==='hero'&&SPRITES.muzzle1){
+      const variant=actor.flashVariant||1;
+      const img=SPRITES['muzzle'+variant]||SPRITES.muzzle1;
+      // Randomize flash frames, keep the white-hot left root glued to the barrel.
+      const phase=clamp(actor.shotFlash/.55,0,1);
+      const flashW=(42+variant*1.6)*S.scale;
+      const flashH=flashW*img.naturalHeight/img.naturalWidth;
+      ctx.save();ctx.globalAlpha=Math.min(1,phase*2.4);
+      ctx.translate(m.x,m.y);ctx.scale(face,1);
+      ctx.drawImage(img,-7*S.scale,-flashH*.5,flashW,flashH);
+      ctx.restore();
+    }else{
+      // Enemy rifle fire keeps a deliberately subtler procedural flash.
+      const s=S.scale*.6;
+      ctx.save();ctx.translate(m.x,m.y);ctx.scale(face,1);
+      ctx.fillStyle='#ffe2a0';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(16*s,-5*s);ctx.lineTo(23*s,0);ctx.lineTo(16*s,5*s);ctx.closePath();ctx.fill();ctx.restore();
+    }
   }
   if(team==='enemy' && actor.hp<actor.maxHp){
     rr(at.x-20*S.scale,y-7*S.scale,40*S.scale,4*S.scale,2*S.scale,'rgba(84,44,39,.7)');
@@ -549,21 +658,59 @@ function drawGrenade(g){
   screenEllipse(p.x,p.y+4*S.scale, 7*S.scale, 3*S.scale, 'rgba(42,56,42,.32)');
   screenEllipse(p.x,p.y, 6*S.scale, 6*S.scale, '#4d6448'); rr(p.x+3*S.scale,p.y-8*S.scale,3*S.scale,5*S.scale,1*S.scale,'#d5cfac');
 }
-function drawBullet(b){
-  const a=project(b.px,b.py,12),c=project(b.x,b.y,12);
-  // Start tracer at actual sprite muzzle, easing onto the physics path over 0.15s.
-  const offset=clamp(1-b.age/.15,0,1);
-  const sx=a.x+b.startDX*offset,sy=a.y+b.startDY*offset;
-  const ex=c.x+b.startDX*offset,ey=c.y+b.startDY*offset;
-  line2(sx,sy,ex,ey,b.side==='hero'?'#ffef9e':'#ff8d78',b.side==='hero'?3:3.6);
-  screenEllipse(ex,ey,2.7,2.7,'#fff7db');
+function renderTrail(trail,side,alpha=1){
+  if(!trail.length)return;
+  const newest=project(trail[0].x,trail[0].y,12);
+  if(newest.x<-110||newest.y<-110||newest.x>S.w+110||newest.y>S.h+110)return;
+  if(trail.length>=2){
+    const oldest=project(trail[trail.length-1].x,trail[trail.length-1].y,12);
+    const grad=ctx.createLinearGradient(oldest.x,oldest.y,newest.x,newest.y);
+    if(side==='hero'){
+      grad.addColorStop(0,'rgba(255,182,42,0)');
+      grad.addColorStop(.48,'rgba(255,197,66,.63)');
+      grad.addColorStop(1,'rgba(255,251,203,1)');
+    }else{
+      grad.addColorStop(0,'rgba(239,87,55,0)');
+      grad.addColorStop(.55,'rgba(244,124,69,.6)');
+      grad.addColorStop(1,'rgba(255,218,163,1)');
+    }
+    ctx.save();ctx.globalAlpha=alpha;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(oldest.x,oldest.y);
+    for(let i=trail.length-2;i>=0;i--){const p=project(trail[i].x,trail[i].y,12);ctx.lineTo(p.x,p.y);}
+    ctx.strokeStyle=side==='hero'?'rgba(255,198,46,.20)':'rgba(255,112,64,.15)';
+    ctx.lineWidth=(side==='hero'?10:8)*S.scale;ctx.stroke();
+    ctx.strokeStyle=grad;ctx.lineWidth=(side==='hero'?4.1:3.2)*S.scale;ctx.stroke();
+    ctx.restore();
+  }
+  ctx.save();ctx.globalAlpha=alpha;
+  const r=(side==='hero'?4.4:3.4)*S.scale;
+  screenEllipse(newest.x,newest.y,r*1.8,r*1.8,side==='hero'?'#ffc757':'#ff895c',.27*alpha);
+  screenEllipse(newest.x,newest.y,r,r,side==='hero'?'#fff5ba':'#ffca96',.97*alpha);
+  screenEllipse(newest.x,newest.y,r*.45,r*.45,'#ffffff',alpha);
+  ctx.restore();
+}
+function renderAllTracers(){
+  // Draw ON TOP of sprites: the old sorted-world layer hid yellow player bullets.
+  for(const ghost of S.trailGhosts)renderTrail(ghost.trail,ghost.side,ghost.life/ghost.ttl*.80);
+  for(const bullet of S.bullets)renderTrail(bullet.trail,bullet.side,1);
 }
 
 function renderEffects(){
   for(const e of S.effects){
     const alpha = clamp(e.life / e.ttl, 0, 1); const p=project(e.x,e.y,18);
     ctx.save(); ctx.globalAlpha = alpha;
-    if(e.type==='text'){ ctx.fillStyle=e.col||'#fff'; ctx.font=`bold ${16*S.scale}px sans-serif`; ctx.textAlign='center'; ctx.fillText(e.text,p.x,p.y - 24*(1-alpha)); }
+    if(e.type==='soldierSpark'||e.type==='coverSpark'){
+      const prefix=e.type==='coverSpark'?'sparkCover':'sparkSoldier';
+      const frame=Math.min(3,Math.floor((e.ttl-e.life)/.046)+1);
+      const img=SPRITES[prefix+frame];
+      if(img){
+        const size=(e.type==='coverSpark'?45:39)*S.scale;
+        ctx.drawImage(img,p.x-size*.5,p.y-size*.5,size,size);
+      }else{
+        screenEllipse(p.x,p.y,5*S.scale,5*S.scale,'#ffe6a2');
+      }
+    }
+    else if(e.type==='text'){ ctx.fillStyle=e.col||'#fff'; ctx.font=`bold ${16*S.scale}px sans-serif`; ctx.textAlign='center'; ctx.fillText(e.text,p.x,p.y - 24*(1-alpha)); }
     else if(e.type==='ring'){ ctx.strokeStyle=e.col||'#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(p.x,p.y+14*S.scale,e.r*.5*S.scale*(1.3-alpha*.6),e.r*.26*S.scale*(1.3-alpha*.6),0,0,TAU); ctx.stroke(); }
     else if(e.type==='dash'){ screenEllipse(p.x,p.y+6*S.scale,26*S.scale*alpha,12*S.scale*alpha,'#fbf2d4',alpha); }
     else { const color={hit:'#f4d59b', muzzle:'#fff0b1', hurt:'#c7685b', blast:'#f8c86a', dust:'#d8c0a0', death:'#cb786b'}[e.type]||'#fff'; screenEllipse(p.x,p.y, e.r*(.45+(1-alpha))*.6*S.scale, e.r*(.45+(1-alpha))*.4*S.scale, color, alpha); }
@@ -578,11 +725,11 @@ function render(){
   const drawList = [];
   for(const o of S.obstacles) drawList.push({sort:o.x+o.y, fn:()=>drawObstacle(o)});
   for(const g of S.grenades) drawList.push({sort:g.x+g.y+1, fn:()=>drawGrenade(g)});
-  for(const b of S.bullets) drawList.push({sort:b.y+b.x+2, fn:()=>drawBullet(b)});
   for(const e of S.enemies) drawList.push({sort:e.x+e.y+3, fn:()=>drawCharacter(e,'enemy')});
   if(S.player) drawList.push({sort:S.player.x+S.player.y+4, fn:()=>{ if(S.player.invuln<=0 || Math.floor(S.time*20)%2===0) drawCharacter(S.player,'hero'); }});
   drawList.sort((a,b)=>a.sort-b.sort);
   for(const item of drawList) item.fn();
+  renderAllTracers();
   renderEffects();
 }
 
